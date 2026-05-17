@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – Susut Listrik{% endblock %}
+
+{% block content %}
+<!-- ══════════════════════════════════════
+     PAGE HEADER
+══════════════════════════════════════ -->
+<div class="page-header">
+  <div class="page-header-left">
+    <div class="page-eyebrow">Monitoring Sistem Distribusi</div>
+    <h1 class="page-title">Dashboard Susut Energi</h1>
+  </div>
+  <div class="page-header-right">
+    <div class="live-badge">
+      <span class="live-dot"></span>
+      <span>Live</span>
+    </div>
+    <div class="last-update" id="last-update-text">Memuat…</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     FILTER BAR
+══════════════════════════════════════ -->
+<div class="filter-bar">
+  <div class="filter-group">
+    <div class="filter-item">
+      <label class="filter-label">Periode</label>
+      <select id="periode" class="filter-select">
+        <option value="januari">Januari</option>
+        <option value="februari">Februari</option>
+        <option value="maret">Maret</option>
+        <option value="april">April</option>
+        <option value="mei" selected>Mei</option>
+        <option value="juni">Juni</option>
+        <option value="juli">Juli</option>
+        <option value="agustus">Agustus</option>
+        <option value="september">September</option>
+        <option value="oktober">Oktober</option>
+        <option value="november">November</option>
+        <option value="desember">Desember</option>
+        <option value="tw1">Triwulan I</option>
+        <option value="tw2">Triwulan II</option>
+        <option value="tw3">Triwulan III</option>
+        <option value="tw4">Triwulan IV</option>
+        <option value="kumulatif">Kumulatif YTD</option>
+      </select>
+    </div>
+    <div class="filter-item">
+      <label class="filter-label">Tahun</label>
+      <select id="tahun" class="filter-select"></select>
+    </div>
+    <button id="reset-filter" class="btn-reset">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      Reset
+    </button>
+  </div>
+  <div class="filter-actions">
+    <button class="btn-action" id="export-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export
+    </button>
+    <label class="theme-switch" title="Toggle dark mode">
+      <input type="checkbox" id="dark-mode-toggle">
+      <span class="theme-track">
+        <span class="theme-thumb">
+          <svg class="icon-sun" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" stroke-width="2"/><line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" stroke-width="2"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2"/><line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="2"/><line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="2"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" stroke-width="2"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="2"/></svg>
+          <svg class="icon-moon" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </span>
+      </span>
+    </label>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     METRIC CARDS
+══════════════════════════════════════ -->
+<div class="metrics-grid" id="metric-cards">
+
+  <!-- Susut % — kartu utama dengan gauge mini -->
+  <div class="metric-card metric-primary" id="card-susut-persen">
+    <div class="metric-card-inner">
+      <div class="metric-header">
+        <span class="metric-label">Susut Energi</span>
+        <span class="metric-badge" id="badge-susut">—</span>
+      </div>
+      <div class="metric-body">
+        <div class="metric-value-big" id="susut-persen">—</div>
+        <div class="gauge-wrap">
+          <svg class="gauge" viewBox="0 0 80 50" aria-hidden="true">
+            <path d="M8 46 A34 34 0 0 1 72 46" fill="none" stroke="var(--gauge-track)" stroke-width="7" stroke-linecap="round"/>
+            <path id="gauge-arc" d="M8 46 A34 34 0 0 1 72 46" fill="none" stroke="var(--gauge-fill)" stroke-width="7" stroke-linecap="round" stroke-dasharray="107" stroke-dashoffset="107"/>
+          </svg>
+          <div class="gauge-label">
+            <span class="gauge-target">Target ≤ 1.5%</span>
+          </div>
+        </div>
+      </div>
+      <div class="metric-footer" id="label-periode-1">—</div>
+    </div>
+  </div>
+
+  <!-- Susut kWh -->
+  <div class="metric-card">
+    <div class="metric-card-inner">
+      <div class="metric-header">
+        <span class="metric-label">Susut (kWh)</span>
+        <span class="metric-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </span>
+      </div>
+      <div class="metric-value-big" id="susut-kwh">—</div>
+      <div class="metric-sparkline" id="spark-susut"></div>
+      <div class="metric-footer" id="label-periode-2">—</div>
+    </div>
+  </div>
+
+  <!-- kWh Beli / Masuk -->
+  <div class="metric-card">
+    <div class="metric-card-inner">
+      <div class="metric-header">
+        <span class="metric-label">kWh Beli (Masuk)</span>
+        <span class="metric-icon metric-icon-blue">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </span>
+      </div>
+      <div class="metric-value-big" id="kwh-beli">—</div>
+      <div class="metric-sub-row">
+        <span class="metric-sub-label">Meter Utama</span>
+      </div>
+      <div class="metric-footer" id="label-periode-3">—</div>
+    </div>
+  </div>
+
+  <!-- kWh Jual / Keluar -->
+  <div class="metric-card">
+    <div class="metric-card-inner">
+      <div class="metric-header">
+        <span class="metric-label">kWh Jual (Keluar)</span>
+        <span class="metric-icon metric-icon-green">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        </span>
+      </div>
+      <div class="metric-value-big" id="kwh-jual">—</div>
+      <div class="metric-sub-row">
+        <span class="metric-sub-label">Total Penyulang</span>
+      </div>
+      <div class="metric-footer" id="label-periode-4">—</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════
+     CHART SUSUT TREND (FULL WIDTH)
+══════════════════════════════════════ -->
+  <div class="panel panel-full">
+  <div class="panel-header">
+    <div class="panel-title-group">
+      <h2 class="panel-title" id="susut-chart-title">Susut Energi</h2>
+      <span class="panel-subtitle">Persentase kehilangan energi per bulan</span>
+    </div>
+    <div class="panel-legend">
+      <span class="legend-item"><span class="legend-dot legend-dot-red"></span>Susut (%)</span>
+      <span class="legend-item"><span class="legend-dot legend-dot-dashed"></span>Target 1.5%</span>
+    </div>
+  </div>
+  <div id="chart-susut" class="chart-area" style="min-height: 300px;"></div>
+</div>
+
+<!-- ══════════════════════════════════════
+     PANEL: kWh JUAL CHART + TABLE (VERTIKAL)
+══════════════════════════════════════ -->
+<div class="panel panel-full">
+  <div class="panel-header">
+    <div class="panel-title-group">
+      <h2 class="panel-title">Distribusi kWh Jual</h2>
+      <span class="panel-subtitle">Perbandingan kategori tarif per bulan</span>
+    </div>
+    <div class="panel-legend">
+      <span class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span>TT</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#10b981"></span>TM</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>TR</span>
+    </div>
+  </div>
+  <div id="chart-kwh-jual" class="chart-area" style="min-height: 320px;"></div>
+  <div class="panel-divider"></div>
+  <div class="panel-sub-header">
+    <span class="panel-sub-title">Tabel Rincian per Kategori Tarif</span>
+  </div>
+  <div class="table-scroll">
+    <table class="data-table" id="table-kwh-jual">
+      <thead>
+        <tr>
+          <th>Bulan</th>
+          <th class="text-right">TT</th>
+          <th class="text-right">TM</th>
+          <th class="text-right">TR</th>
+          <th class="text-right">Total</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TABEL DETAIL SUSUT BULANAN
+══════════════════════════════════════ -->
+<div class="panel panel-full">
+  <div class="panel-header">
+    <div class="panel-title-group">
+      <h2 class="panel-title">Detail Susut Bulanan</h2>
+      <span class="panel-subtitle">Perbandingan Meter Utama vs Total Penyulang</span>
+    </div>
+    <div class="panel-pills" id="status-pills"></div>
+  </div>
+  <div class="table-scroll">
+    <table class="data-table data-table-striped" id="table-detail">
+      <thead>
+        <tr>
+          <th>Bulan</th>
+          <th class="text-right">Meter Utama (kWh)</th>
+          <th class="text-right">Total Penyulang (kWh)</th>
+          <th class="text-right">Susut (kWh)</th>
+          <th class="text-right">Susut (%)</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+      <tfoot></tfoot>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
