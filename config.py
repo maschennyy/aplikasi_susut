@@ -1,7 +1,27 @@
 import os
+from dotenv import load_dotenv
+
+# Muat variabel dari file .env
+load_dotenv()
 
 class Config:
-    # Koneksi PostgreSQL
-    SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:Unsada2026@localhost:5432/losses_app_db'
+    # Koneksi database — dibaca dari .env, bukan hardcoded
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SECRET_KEY = 'rahasia-super-secret-key-123'  # Ganti dengan string random
+
+    # Secret key — dibaca dari .env
+    SECRET_KEY = os.getenv('SECRET_KEY', 'fallback-key-ganti-ini')
+
+    # Validasi: pastikan DATABASE_URL tidak kosong saat startup
+    @staticmethod
+    def validate():
+        if not os.getenv('DATABASE_URL'):
+            raise ValueError(
+                "DATABASE_URL tidak ditemukan. "
+                "Pastikan file .env sudah dibuat dan berisi DATABASE_URL."
+            )
+        if not os.getenv('SECRET_KEY'):
+            raise ValueError(
+                "SECRET_KEY tidak ditemukan. "
+                "Tambahkan SECRET_KEY ke file .env kamu."
+            )

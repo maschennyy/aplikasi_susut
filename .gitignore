@@ -1,0 +1,49 @@
+# ============================================================
+# .gitignore — aplikasi_susut
+# ============================================================
+
+# --- Rahasia & konfigurasi lokal ---
+.env
+.env.local
+*.env
+
+# --- Python bytecode ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+
+# --- Virtual environment ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Database lokal ---
+*.db
+*.sqlite
+*.sqlite3
+instance/
+
+# --- Build & distribusi ---
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# --- Editor & OS ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+
+# --- Log ---
+*.log
+logs/
+
+# --- Upload sementara ---
+uploads/
+tmp/
