@@ -1,86 +1,86 @@
 /* ════════════════════════════════════════════════════
-   SUSUT ENERGI DASHBOARD — dashboard.js
-   Kompatibel dengan endpoint: GET /api/dashboard-data
-   Format response: { data_bulanan: [...] }
+   dashboard.js v2 — Susut Energi
+   Requires: Chart.js (loaded in base.html)
+   API contract: GET /api/dashboard-data
 ════════════════════════════════════════════════════ */
 
 'use strict';
 
-// ─────────────────────────────────────
-// STATE
-// ─────────────────────────────────────
-let allData      = [];
+const TARGET_SUSUT = 1.5;
+const MONTH_NAMES  = ['Januari','Februari','Maret','April','Mei','Juni',
+                      'Juli','Agustus','September','Oktober','November','Desember'];
+const MONTH_SHORT  = ['Jan','Feb','Mar','Apr','Mei','Jun',
+                      'Jul','Ags','Sep','Okt','Nov','Des'];
+
+let allData        = [];
 let currentPeriode = 'mei';
-let currentTahun   = 2026;
-
-const MONTH_NAMES = ['Januari','Februari','Maret','April','Mei','Juni',
-                     'Juli','Agustus','September','Oktober','November','Desember'];
-const MONTH_SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun',
-                     'Jul','Ags','Sep','Okt','Nov','Des'];
-const TARGET_SUSUT = 1.5; // % batas toleransi
+let currentTahun   = new Date().getFullYear();
+let mainChart      = null;
+let sparkInstances = {};
 
 // ─────────────────────────────────────
-// THEME HELPERS
+// INIT
 // ─────────────────────────────────────
-const isDark = () => document.body.classList.contains('dark');
-
-function chartTheme() {
-  const dark = isDark();
-  return {
-    font:    dark ? '#8b949e' : '#6b7280',
-    grid:    dark ? '#1e2a3a' : '#f3f4f6',
-    paper:   'rgba(0,0,0,0)',
-    plot:    'rgba(0,0,0,0)',
-    border:  dark ? '#2d3748' : '#e4e7ed',
-  };
-}
-
-// ─────────────────────────────────────
-// INIT: TAHUN SELECT
-// ─────────────────────────────────────
-(function initTahun() {
+(function init() {
   const sel = document.getElementById('tahun');
-  for (let y = 2020; y <= 2030; y++) {
-    const opt = document.createElement('option');
-    opt.value = y;
-    opt.textContent = y;
-    if (y === currentTahun) opt.selected = true;
-    sel.appendChild(opt);
+  if (sel) {
+    for (let y = 2020; y <= 2030; y++) {
+      const o = document.createElement('option');
+      o.value = y; o.textContent = y;
+      if (y === currentTahun) o.selected = true;
+      sel.appendChild(o);
+    }
   }
+  bindEvents();
+  loadData();
 })();
 
 // ─────────────────────────────────────
 // EVENTS
 // ─────────────────────────────────────
-document.getElementById('periode').addEventListener('change', e => {
-  currentPeriode = e.target.value;
-  updateDashboard();
-});
-document.getElementById('tahun').addEventListener('change', e => {
-  currentTahun = parseInt(e.target.value);
-  updateDashboard();
-});
-document.getElementById('reset-filter').addEventListener('click', () => {
-  document.getElementById('periode').value = 'mei';
-  document.getElementById('tahun').value   = 2026;
-  currentPeriode = 'mei';
-  currentTahun   = 2026;
-  updateDashboard();
-});
-document.getElementById('export-btn')?.addEventListener('click', exportCSV);
+function bindEvents() {
+  document.getElementById('periode')?.addEventListener('change', e => {
+    currentPeriode = e.target.value; updateDashboard();
+  });
+  document.getElementById('tahun')?.addEventListener('change', e => {
+    currentTahun = parseInt(e.target.value); loadData();
+  });
+  document.getElementById('reset-filter')?.addEventListener('click', () => {
+    document.getElementById('periode').value = 'mei';
+    document.getElementById('tahun').value   = new Date().getFullYear();
+    currentPeriode = 'mei';
+    currentTahun   = new Date().getFullYear();
+    loadData();
+  });
+  document.getElementById('export-btn')?.addEventListener('click', exportCSV);
 
-// Dark mode
-const darkToggle = document.getElementById('dark-mode-toggle');
-darkToggle.addEventListener('change', function () {
-  document.body.classList.toggle('dark', this.checked);
-  localStorage.setItem('darkMode', this.checked);
-  if (allData.length) renderCharts(
-    getYearData(), buildMonthKeys(), buildMonthLabels()
-  );
-});
-if (localStorage.getItem('darkMode') === 'true') {
-  darkToggle.checked = true;
-  document.body.classList.add('dark');
+  // filter tabs (3B / 6B / 12B)
+  document.querySelectorAll('.ftab').forEach(btn => {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.ftab').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      renderMainChart(getYearData(), parseInt(this.dataset.range || 6));
+    });
+  });
+
+  // dark mode toggle in sidebar
+  document.querySelector('.dark-toggle')?.addEventListener('click', () => {
+    document.body.classList.toggle('dark');
+    localStorage.setItem('darkMode', document.body.classList.contains('dark'));
+    if (allData.length) renderMainChart(getYearData(), activeRange());
+  });
+  if (localStorage.getItem('darkMode') === 'true') {
+    document.body.classList.add('dark');
+  }
+
+  // sidebar collapse
+  document.querySelector('.sidebar-toggle')?.addEventListener('click', () => {
+    document.querySelector('.sidebar')?.classList.toggle('collapsed');
+  });
+}
+
+function activeRange() {
+  return parseInt(document.querySelector('.ftab.active')?.dataset.range || 6);
 }
 
 // ─────────────────────────────────────
@@ -88,33 +88,31 @@ if (localStorage.getItem('darkMode') === 'true') {
 // ─────────────────────────────────────
 async function loadData() {
   try {
-    const r = await fetch('/api/dashboard-data');
+    const r = await fetch(`/api/dashboard-data?tahun=${currentTahun}`);
     if (!r.ok) throw new Error(r.statusText);
     const json = await r.json();
     allData = json.data_bulanan || [];
     updateDashboard();
-    document.getElementById('last-update-text').textContent =
-      'Update: ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    const el = document.getElementById('live-label');
+    if (el) el.textContent = 'Live · ' + new Date().toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' });
   } catch (err) {
-    console.error('Gagal memuat data:', err);
-    // Gunakan data demo jika endpoint belum tersedia
-    allData = generateDemoData();
+    console.warn('API belum siap, pakai demo data:', err.message);
+    allData = demoData();
     updateDashboard();
-    document.getElementById('last-update-text').textContent = 'Demo data';
+    const el = document.getElementById('live-label');
+    if (el) el.textContent = 'Demo';
   }
 }
 
-// Demo data agar UI dapat dipreview tanpa backend
-function generateDemoData() {
+function demoData() {
   return Array.from({ length: 12 }, (_, i) => {
-    const mu = 170000 + Math.random() * 30000;
-    const py = mu * (1 - (0.012 + Math.random() * 0.008));
+    const mu = 165000 + Math.round(Math.sin(i * .8) * 15000 + 15000);
+    const py = Math.round(mu * (1 - (0.012 + Math.sin(i * 1.3 + 1) * .003 + .002)));
     return {
-      tanggal:          `${currentTahun}-${String(i + 1).padStart(2, '0')}-01`,
-      meter_utama:      Math.round(mu),
-      total_penyulang:  Math.round(py),
-      susut_kwh:        Math.round(mu - py),
-      persentase_susut: parseFloat(((mu - py) / mu * 100).toFixed(2)),
+      tanggal: `${currentTahun}-${String(i+1).padStart(2,'0')}-01`,
+      meter_utama: mu, total_penyulang: py,
+      susut_kwh: mu - py,
+      persentase_susut: parseFloat(((mu - py) / mu * 100).toFixed(2))
     };
   });
 }
@@ -124,15 +122,13 @@ function generateDemoData() {
 // ─────────────────────────────────────
 function updateDashboard() {
   if (!allData.length) return;
-  const yearData   = getYearData();
-  const keys       = buildMonthKeys();
-  const labels     = buildMonthLabels();
-  const periodeAgg = getPeriodeData(yearData, currentPeriode);
-
-  renderMetricCards(periodeAgg);
-  renderCharts(yearData, keys, labels);
+  const yearData = getYearData();
+  const agg      = getPeriodeData(yearData, currentPeriode);
+  renderMetricCards(agg, yearData);
+  renderMainChart(yearData, activeRange());
+  renderKwhJualChart(yearData);
   renderDetailTable(yearData);
-  updateLabelPeriode();
+  updatePeriodeLabels();
 }
 
 // ─────────────────────────────────────
@@ -141,308 +137,263 @@ function updateDashboard() {
 function getYearData() {
   return allData.filter(d => new Date(d.tanggal).getFullYear() === currentTahun);
 }
-function buildMonthKeys() {
-  return Array.from({ length: 12 }, (_, i) =>
-    `${currentTahun}-${String(i + 1).padStart(2, '0')}`
-  );
-}
-function buildMonthLabels() {
-  return MONTH_SHORT.slice(); // hanya nama bulan, tanpa tahun
-}
 
-// ─────────────────────────────────────
-// PERIODE AGGREGATION
-// ─────────────────────────────────────
 function getPeriodeData(yearData, periode) {
-  const months = MONTH_NAMES.map(m => m.toLowerCase());
-  if (months.includes(periode)) {
-    const idx = months.indexOf(periode);
+  const names = MONTH_NAMES.map(m => m.toLowerCase());
+  if (names.includes(periode)) {
+    const idx = names.indexOf(periode);
     return yearData.find(d => new Date(d.tanggal).getMonth() === idx) || null;
   }
   const TW = { tw1:[0,1,2], tw2:[3,4,5], tw3:[6,7,8], tw4:[9,10,11] };
-  if (TW[periode]) return aggregate(yearData.filter(d => TW[periode].includes(new Date(d.tanggal).getMonth())));
-  if (periode === 'kumulatif') return aggregate(yearData);
+  if (TW[periode]) return agg(yearData.filter(d => TW[periode].includes(new Date(d.tanggal).getMonth())));
+  if (periode === 'kumulatif') return agg(yearData);
   return null;
 }
 
-function aggregate(arr) {
+function agg(arr) {
   if (!arr.length) return null;
-  const mu   = arr.reduce((s, d) => s + d.meter_utama, 0);
-  const py   = arr.reduce((s, d) => s + d.total_penyulang, 0);
-  const skwh = mu - py;
-  return { meter_utama: mu, total_penyulang: py, susut_kwh: skwh, persentase_susut: mu ? skwh / mu * 100 : 0 };
+  const mu = arr.reduce((s,d) => s + d.meter_utama, 0);
+  const py = arr.reduce((s,d) => s + d.total_penyulang, 0);
+  const sk = mu - py;
+  return { meter_utama: mu, total_penyulang: py, susut_kwh: sk,
+           persentase_susut: mu ? sk/mu*100 : 0 };
 }
 
 // ─────────────────────────────────────
 // METRIC CARDS
 // ─────────────────────────────────────
-function renderMetricCards(data) {
+function renderMetricCards(data, yearData) {
   const p = data?.persentase_susut ?? null;
-  const status = p == null ? 'neutral' : p > TARGET_SUSUT ? 'danger' : p > TARGET_SUSUT * 0.8 ? 'warn' : 'ok';
+  const status = p == null ? 'neutral' : p > TARGET_SUSUT ? 'danger' : p > TARGET_SUSUT*.85 ? 'warn' : 'ok';
 
-  // Susut %
-  document.getElementById('susut-persen').textContent = p != null ? fmtPct(p) : '—';
+  set('susut-persen', p != null ? p.toFixed(2)+'%' : '—');
+  set('kwh-beli',     data?.meter_utama    != null ? fmtNum(data.meter_utama)    : '—');
+  set('kwh-jual',     data?.total_penyulang!= null ? fmtNum(data.total_penyulang): '—');
+  set('susut-kwh',    data?.susut_kwh      != null ? fmtNum(data.susut_kwh)      : '—');
+
   const badge = document.getElementById('badge-susut');
-  badge.textContent = p != null ? (status === 'ok' ? '✓ Normal' : status === 'warn' ? '⚠ Perhatian' : '✕ Melebihi') : '—';
-  badge.className = 'metric-badge ' + (status === 'neutral' ? '' : status);
+  if (badge && p != null) {
+    badge.textContent = status==='ok' ? '↓ Normal' : status==='warn' ? '⚠ Perhatian' : '↑ Melebihi';
+    badge.className   = 'mc-badge ' +
+      (status==='ok' ? 'mc-badge-up' : status==='warn' ? 'mc-badge-warn' : 'mc-badge-down');
+  }
 
-  // Gauge
-  updateGauge(p);
+  // sparklines dari data year
+  const susutPct = yearData.map(d => d.persentase_susut);
+  const muVals   = yearData.map(d => d.meter_utama / 1000);
+  const pyVals   = yearData.map(d => d.total_penyulang / 1000);
+  const skVals   = yearData.map(d => d.susut_kwh);
 
-  // Susut kWh
-  document.getElementById('susut-kwh').textContent = data?.susut_kwh != null ? fmtNum(data.susut_kwh) + ' kWh' : '—';
+  sparkLine('spark-susut-pct', susutPct, '#ef4444');
+  sparkLine('spark-mu',        muVals,   '#4f7df4');
+  sparkLine('spark-py',        pyVals,   '#8b5cf6');
+  sparkLine('spark-susut-kwh', skVals,   '#f59e0b');
 
-  // Beli / Jual
-  document.getElementById('kwh-beli').textContent = data?.meter_utama != null ? fmtNum(data.meter_utama) + ' kWh' : '—';
-  document.getElementById('kwh-jual').textContent = data?.total_penyulang != null ? fmtNum(data.total_penyulang) + ' kWh' : '—';
-}
-
-function updateGauge(persen) {
-  const arc = document.getElementById('gauge-arc');
-  if (!arc) return;
-  const maxLen  = 107; // approx arc length for the SVG path
-  const maxPct  = 5;   // 5% = full arc
-  const ratio   = Math.min((persen || 0) / maxPct, 1);
-  const offset  = maxLen - ratio * maxLen;
-  arc.style.strokeDashoffset = offset;
-  arc.style.stroke = (persen || 0) > TARGET_SUSUT ? '#dc2626' : (persen || 0) > TARGET_SUSUT * 0.8 ? '#d97706' : '#059669';
-}
-
-function updateLabelPeriode() {
-  const sel   = document.getElementById('periode');
-  const label = sel.options[sel.selectedIndex].text + ' ' + currentTahun;
-  for (let i = 1; i <= 4; i++) {
-    const el = document.getElementById(`label-periode-${i}`);
-    if (el) el.textContent = label;
+  // floating popup
+  const last = yearData[yearData.length - 1];
+  const prev = yearData[yearData.length - 2];
+  if (last) {
+    const d = new Date(last.tanggal);
+    set('fp-bulan', MONTH_SHORT[d.getMonth()] + ' ' + d.getFullYear());
+    set('fp-val',   last.persentase_susut.toFixed(2) + '%');
+    if (prev) {
+      const diff = last.persentase_susut - prev.persentase_susut;
+      const el   = document.getElementById('fp-chg');
+      if (el) {
+        el.textContent = (diff >= 0 ? '↑ +' : '↓ ') + Math.abs(diff).toFixed(2) + '% dari ' + MONTH_SHORT[new Date(prev.tanggal).getMonth()];
+        el.style.color = diff > 0 ? 'var(--red)' : 'var(--green)';
+      }
+    }
   }
 }
 
 // ─────────────────────────────────────
-// CHARTS (Plotly)
+// SPARKLINE
 // ─────────────────────────────────────
-function renderCharts(yearData, monthKeys, labels) {
-  const theme = chartTheme();
-
-  // Map data kebulan
-  const susutMap = {};
-  yearData.forEach(d => { susutMap[d.tanggal.substring(0, 7)] = d.persentase_susut; });
-  const susutVals = monthKeys.map(k => susutMap[k] ?? null);
-
-  // ── Chart Susut Trend ──────────────────────────
-  // Update judul chart dengan tahun yang dipilih
-  const susutChartTitle = document.getElementById('susut-chart-title');
-  if (susutChartTitle) susutChartTitle.textContent = `Susut Energi ${currentTahun}`;
-
-  const traceSusut = {
-    x: labels, y: susutVals,
-    type: 'scatter', mode: 'lines+markers+text',
-    name: 'Susut %',
-    line: { color: '#dc2626', width: 2.5, shape: 'spline' },
-    marker: { color: '#dc2626', size: 7, symbol: 'circle',
-              line: { color: '#fff', width: 2 } },
-    fill: 'tozeroy',
-    fillcolor: isDark() ? 'rgba(220,38,38,0.07)' : 'rgba(220,38,38,0.06)',
-    connectgaps: false,
-    text: susutVals.map(v => v != null ? v.toFixed(2) + '%' : ''),
-    textposition: 'top center',
-    textfont: {
-      family: "'JetBrains Mono', monospace",
-      size: 10,
-      color: isDark() ? '#f87171' : '#dc2626',
+function sparkLine(canvasId, data, color) {
+  if (sparkInstances[canvasId]) { sparkInstances[canvasId].destroy(); }
+  const el = document.getElementById(canvasId);
+  if (!el || !data.length) return;
+  sparkInstances[canvasId] = new Chart(el, {
+    type: 'line',
+    data: {
+      labels: data.map((_,i) => i),
+      datasets: [{
+        data, borderColor: color, borderWidth: 2,
+        pointRadius: 0, tension: .4, fill: true,
+        backgroundColor: color + '22',
+      }]
     },
-    hovertemplate: '<b>%{x}</b><br>Susut: %{y:.2f}%<extra></extra>',
-  };
-  const traceTarget = {
-    x: labels, y: Array(12).fill(TARGET_SUSUT),
-    type: 'scatter', mode: 'lines', name: `Target ${TARGET_SUSUT}%`,
-    line: { color: '#94a3b8', width: 1.5, dash: 'dot' },
-    hoverinfo: 'skip',
-  };
-
-  const layoutBase = {
-    paper_bgcolor: theme.paper,
-    plot_bgcolor:  theme.plot,
-    font: { family: "'DM Sans', sans-serif", color: theme.font, size: 12 },
-    margin: { t: 32, r: 20, b: 48, l: 16 },
-    showlegend: false,
-    xaxis: {
-      showgrid: false, zeroline: false,
-      tickfont: { size: 11, color: theme.font },
-      tickangle: 0,
-      automargin: true,
-      fixedrange: true,
-    },
-    yaxis: {
-      visible: false,
-      zeroline: false,
-      fixedrange: true,
-      // beri ruang di atas agar label tidak terpotong
-      range: [0, Math.max(...susutVals.filter(v => v != null), TARGET_SUSUT) * 1.35],
-    },
-  };
-
-  Plotly.react('chart-susut', [traceSusut, traceTarget], layoutBase, {
-    responsive: true, displayModeBar: false,
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: { x: { display: false }, y: { display: false } },
+      animation: { duration: 400 }
+    }
   });
-
-  // ── Chart kWh Jual (dummy categories) ──────────
-  const seed = currentTahun * 13;
-  const rng  = (i, base, spread) => Math.round(base + ((seed * (i + 1) * 7919) % spread));
-  const ttArr = monthKeys.map((_, i) => rng(i, 12000, 18000));
-  const tmArr = monthKeys.map((_, i) => rng(i, 22000, 24000));
-  const trArr = monthKeys.map((_, i) => rng(i, 32000, 28000));
-  window._kwhJualData = { labels, TT: ttArr, TM: tmArr, TR: trArr };
-
-  const maxBarVal = Math.max(...ttArr, ...tmArr, ...trArr);
-
-  const barLayout = {
-    paper_bgcolor: theme.paper,
-    plot_bgcolor:  theme.plot,
-    font: { family: "'DM Sans', sans-serif", color: theme.font, size: 12 },
-    margin: { t: 36, r: 20, b: 48, l: 16 },
-    barmode: 'group',
-    bargap: 0.22,
-    bargroupgap: 0.08,
-    showlegend: true,
-    legend: { orientation: 'h', y: 1.12, x: 0, font: { size: 11, color: theme.font } },
-    xaxis: {
-      showgrid: false, zeroline: false,
-      tickfont: { size: 11, color: theme.font },
-      tickangle: 0, automargin: true, fixedrange: true,
-    },
-    yaxis: {
-      visible: false, zeroline: false, fixedrange: true,
-      range: [0, maxBarVal * 1.22],
-    },
-  };
-
-  Plotly.react('chart-kwh-jual', [
-    { x: labels, y: ttArr, name: 'TT', type: 'bar',
-      marker: { color: isDark() ? '#60a5fa' : '#3b82f6', opacity: 0.9 },
-      text: ttArr.map(v => fmtNumK(v)), textposition: 'outside',
-      textfont: { size: 9, color: isDark() ? '#60a5fa' : '#3b82f6' },
-      hovertemplate: '<b>%{x}</b><br>TT: %{y:,} kWh<extra></extra>', cliponaxis: false },
-    { x: labels, y: tmArr, name: 'TM', type: 'bar',
-      marker: { color: isDark() ? '#34d399' : '#10b981', opacity: 0.9 },
-      text: tmArr.map(v => fmtNumK(v)), textposition: 'outside',
-      textfont: { size: 9, color: isDark() ? '#34d399' : '#059669' },
-      hovertemplate: '<b>%{x}</b><br>TM: %{y:,} kWh<extra></extra>', cliponaxis: false },
-    { x: labels, y: trArr, name: 'TR', type: 'bar',
-      marker: { color: isDark() ? '#fbbf24' : '#f59e0b', opacity: 0.9 },
-      text: trArr.map(v => fmtNumK(v)), textposition: 'outside',
-      textfont: { size: 9, color: isDark() ? '#fbbf24' : '#d97706' },
-      hovertemplate: '<b>%{x}</b><br>TR: %{y:,} kWh<extra></extra>', cliponaxis: false },
-  ], barLayout, { responsive: true, displayModeBar: false });
-
-  renderKwhJualTable(labels, ttArr, tmArr, trArr);
-
-  // ── Sparkline susut kWh ────────────────────────
-  const susutKwhVals = monthKeys.map(k => {
-    const d = yearData.find(r => r.tanggal.substring(0, 7) === k);
-    return d?.susut_kwh ?? null;
-  });
-  Plotly.react('spark-susut', [{
-    x: monthKeys, y: susutKwhVals, type: 'scatter', mode: 'lines',
-    line: { color: '#dc2626', width: 1.5 }, fill: 'tozeroy',
-    fillcolor: 'rgba(220,38,38,0.08)',
-  }], {
-    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-    margin: { t: 0, r: 0, b: 0, l: 0 },
-    xaxis: { visible: false }, yaxis: { visible: false },
-    showlegend: false,
-  }, { responsive: true, displayModeBar: false, staticPlot: true });
 }
 
 // ─────────────────────────────────────
-// TABLE: kWh JUAL
+// MAIN CHART (Tren Susut)
 // ─────────────────────────────────────
-function renderKwhJualTable(labels, tt, tm, tr) {
-  const tbody = document.querySelector('#table-kwh-jual tbody');
-  if (!tbody) return;
-  let sTT = 0, sTM = 0, sTR = 0;
-  tbody.innerHTML = '';
-  labels.forEach((lbl, i) => {
-    sTT += tt[i]; sTM += tm[i]; sTR += tr[i];
-    const total = tt[i] + tm[i] + tr[i];
-    tbody.insertAdjacentHTML('beforeend', `
-      <tr>
-        <td>${lbl}</td>
-        <td class="text-right text-mono">${fmtNum(tt[i])}</td>
-        <td class="text-right text-mono">${fmtNum(tm[i])}</td>
-        <td class="text-right text-mono">${fmtNum(tr[i])}</td>
-        <td class="text-right text-mono"><strong>${fmtNum(total)}</strong></td>
-      </tr>
-    `);
+function renderMainChart(yearData, range) {
+  const slice  = yearData.slice(-range);
+  const labels = slice.map(d => {
+    const dt = new Date(d.tanggal);
+    return MONTH_SHORT[dt.getMonth()] + " '" + String(dt.getFullYear()).slice(-2);
   });
-  tbody.insertAdjacentHTML('beforeend', `
-    <tr style="font-weight:700;background:var(--c-surface-2)">
-      <td>TOTAL</td>
-      <td class="text-right text-mono">${fmtNum(sTT)}</td>
-      <td class="text-right text-mono">${fmtNum(sTM)}</td>
-      <td class="text-right text-mono">${fmtNum(sTR)}</td>
-      <td class="text-right text-mono">${fmtNum(sTT+sTM+sTR)}</td>
-    </tr>
-  `);
+  const vals   = slice.map(d => d.persentase_susut);
+  const target = Array(slice.length).fill(TARGET_SUSUT);
+
+  if (mainChart) { mainChart.destroy(); }
+  const el = document.getElementById('chart-susut');
+  if (!el) return;
+
+  mainChart = new Chart(el, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          data: vals, borderColor: '#4f7df4', borderWidth: 2.5,
+          pointRadius: vals.map((_,i) => i === vals.length-1 ? 6 : 3),
+          pointBackgroundColor: vals.map((v,i) =>
+            i === vals.length-1 ? (v > TARGET_SUSUT ? '#ef4444' : '#4f7df4') : '#4f7df4'),
+          pointBorderColor: '#fff', pointBorderWidth: 2,
+          tension: .4, fill: true,
+          backgroundColor: (ctx) => {
+            const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 180);
+            g.addColorStop(0, 'rgba(79,125,244,.12)');
+            g.addColorStop(1, 'rgba(79,125,244,.0)');
+            return g;
+          },
+        },
+        {
+          data: target, borderColor: '#ef444455', borderWidth: 1.5,
+          borderDash: [5,4], pointRadius: 0, fill: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => c.datasetIndex === 0 ? 'Susut: ' + c.raw.toFixed(2) + '%' : null,
+            filter: i => i.datasetIndex === 0
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 11, family: "'Sora',sans-serif" } } },
+        y: {
+          grid: { color: 'rgba(0,0,0,.04)' },
+          ticks: { callback: v => v+'%', color: '#9ca3af', font: { size: 11, family: "'Sora',sans-serif" } },
+          min: 0.5, max: Math.max(...vals, TARGET_SUSUT) + .4
+        }
+      }
+    }
+  });
 }
 
 // ─────────────────────────────────────
-// TABLE: DETAIL SUSUT BULANAN
+// kWh JUAL CHART
+// ─────────────────────────────────────
+function renderKwhJualChart(yearData) {
+  const el = document.getElementById('chart-kwh-jual');
+  if (!el) return;
+
+  // Dummy distribusi kategori (akan diganti data real saat model TT/TM/TR tersedia)
+  const seed = currentTahun * 7;
+  const rng  = (i, base, sp) => Math.round(base + ((seed*(i+1)*3571)%sp));
+  const labels = yearData.map(d => MONTH_SHORT[new Date(d.tanggal).getMonth()]);
+  const tt = yearData.map((_,i) => rng(i, 12000, 16000));
+  const tm = yearData.map((_,i) => rng(i, 22000, 20000));
+  const tr = yearData.map((_,i) => rng(i, 34000, 22000));
+
+  if (window._jualChart) window._jualChart.destroy();
+  window._jualChart = new Chart(el, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label:'TT', data:tt, backgroundColor:'rgba(79,125,244,.85)', borderRadius:4, borderSkipped:false },
+        { label:'TM', data:tm, backgroundColor:'rgba(16,185,129,.85)', borderRadius:4, borderSkipped:false },
+        { label:'TR', data:tr, backgroundColor:'rgba(245,158,11,.85)', borderRadius:4, borderSkipped:false },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, barPercentage: .7, categoryPercentage: .7,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color:'#9ca3af', font:{ size:10, family:"'Sora',sans-serif" } } },
+        y: { grid: { color:'rgba(0,0,0,.04)' }, ticks: { color:'#9ca3af', font:{ size:10, family:"'Sora',sans-serif" } } }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────
+// DETAIL TABLE
 // ─────────────────────────────────────
 function renderDetailTable(data) {
   const tbody = document.querySelector('#table-detail tbody');
   const tfoot = document.querySelector('#table-detail tfoot');
   if (!tbody) return;
-  tbody.innerHTML = '';
 
-  let countDanger = 0, countWarn = 0, countOk = 0;
+  tbody.innerHTML = '';
+  let nOk=0, nWarn=0, nDng=0;
+  let tmu=0, tpy=0, tsk=0;
+
   data.forEach(row => {
-    const p      = row.persentase_susut;
-    const isDng  = p > TARGET_SUSUT;
-    const isWrn  = !isDng && p > TARGET_SUSUT * 0.85;
-    if (isDng) countDanger++; else if (isWrn) countWarn++; else countOk++;
-    const rowClass = isDng ? 'row-danger' : isWrn ? 'row-warn' : '';
-    const badge    = isDng
-      ? `<span class="status-danger">↑ Melebihi</span>`
-      : isWrn
-        ? `<span class="status-warn">⚠ Perhatian</span>`
-        : `<span class="status-ok">✓ Normal</span>`;
+    const p = row.persentase_susut;
+    const isDng = p > TARGET_SUSUT, isWrn = !isDng && p > TARGET_SUSUT*.85;
+    if (isDng) nDng++; else if (isWrn) nWarn++; else nOk++;
+    tmu += row.meter_utama; tpy += row.total_penyulang; tsk += row.susut_kwh;
+
+    const cls   = isDng ? 'row-danger' : isWrn ? 'row-warn' : '';
+    const badge = isDng ? `<span class="s-danger">Melebihi</span>`
+                        : isWrn ? `<span class="s-warn">Perhatian</span>`
+                        : `<span class="s-ok">Normal</span>`;
+    const d = new Date(row.tanggal);
     tbody.insertAdjacentHTML('beforeend', `
-      <tr class="${rowClass}">
-        <td><strong>${fmtDate(row.tanggal)}</strong></td>
-        <td class="text-right text-mono">${fmtNum(row.meter_utama)}</td>
-        <td class="text-right text-mono">${fmtNum(row.total_penyulang)}</td>
-        <td class="text-right text-mono">${fmtNum(row.susut_kwh)}</td>
-        <td class="text-right text-mono">${fmtPct(p)}</td>
+      <tr class="${cls}">
+        <td><strong>${MONTH_SHORT[d.getMonth()]} ${d.getFullYear()}</strong></td>
+        <td class="tr mono">${fmtNum(row.meter_utama)}</td>
+        <td class="tr mono">${fmtNum(row.total_penyulang)}</td>
+        <td class="tr mono">${fmtNum(row.susut_kwh)}</td>
+        <td class="tr mono">${p.toFixed(2)}%</td>
         <td>${badge}</td>
-      </tr>
-    `);
+      </tr>`);
   });
 
-  // Pills summary
   const pills = document.getElementById('status-pills');
-  if (pills) {
-    pills.innerHTML = `
-      <span class="status-ok">${countOk} Normal</span>
-      <span class="status-warn">${countWarn} Perhatian</span>
-      <span class="status-danger">${countDanger} Melebihi</span>
-    `;
-  }
+  if (pills) pills.innerHTML = `
+    <span class="s-ok">${nOk} Normal</span>
+    <span class="s-warn">${nWarn} Perhatian</span>
+    <span class="s-danger">${nDng} Melebihi</span>`;
 
-  // Footer total
-  const totMU = data.reduce((s, d) => s + d.meter_utama, 0);
-  const totPY = data.reduce((s, d) => s + d.total_penyulang, 0);
-  const totSK = totMU - totPY;
-  const totSP = totMU ? totSK / totMU * 100 : 0;
-  tfoot.innerHTML = `
+  const tp = tmu ? (tsk/tmu*100) : 0;
+  if (tfoot) tfoot.innerHTML = `
     <tr>
       <td><strong>Total / Rata-rata</strong></td>
-      <td class="text-right text-mono"><strong>${fmtNum(totMU)}</strong></td>
-      <td class="text-right text-mono"><strong>${fmtNum(totPY)}</strong></td>
-      <td class="text-right text-mono"><strong>${fmtNum(totSK)}</strong></td>
-      <td class="text-right text-mono"><strong>${fmtPct(totSP)}</strong></td>
+      <td class="tr mono"><strong>${fmtNum(tmu)}</strong></td>
+      <td class="tr mono"><strong>${fmtNum(tpy)}</strong></td>
+      <td class="tr mono"><strong>${fmtNum(tsk)}</strong></td>
+      <td class="tr mono"><strong>${tp.toFixed(2)}%</strong></td>
       <td></td>
-    </tr>
-  `;
+    </tr>`;
+}
+
+// ─────────────────────────────────────
+// LABELS
+// ─────────────────────────────────────
+function updatePeriodeLabels() {
+  const sel = document.getElementById('periode');
+  if (!sel) return;
+  const label = sel.options[sel.selectedIndex].text + ' ' + currentTahun;
+  ['label-periode-1','label-periode-2','label-periode-3'].forEach(id => set(id, label));
 }
 
 // ─────────────────────────────────────
@@ -452,53 +403,25 @@ function exportCSV() {
   if (!allData.length) return;
   const rows = [['Bulan','Meter Utama (kWh)','Total Penyulang (kWh)','Susut (kWh)','Susut (%)']];
   getYearData().forEach(d => {
-    rows.push([fmtDate(d.tanggal), d.meter_utama, d.total_penyulang, d.susut_kwh, d.persentase_susut.toFixed(2)]);
+    const dt = new Date(d.tanggal);
+    rows.push([MONTH_NAMES[dt.getMonth()]+' '+dt.getFullYear(),
+               d.meter_utama, d.total_penyulang, d.susut_kwh, d.persentase_susut.toFixed(2)]);
   });
   const csv  = rows.map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `susut_${currentTahun}.csv`;
-  a.click();
+  a.href = url; a.download = `susut_${currentTahun}.csv`; a.click();
   URL.revokeObjectURL(url);
 }
 
 // ─────────────────────────────────────
 // UTILS
 // ─────────────────────────────────────
-function fmtNum(n)  { return new Intl.NumberFormat('id-ID').format(Math.round(n)); }
-function fmtNumK(n) {
-  if (n >= 1000000) return (n / 1000000).toFixed(1).replace('.', ',') + 'M';
-  if (n >= 1000)    return (n / 1000).toFixed(1).replace('.', ',') + 'k';
-  return String(Math.round(n));
-}
-function fmtPct(n)  { return n != null ? n.toFixed(2) + '%' : '—'; }
-function fmtDate(s) {
-  const d = new Date(s);
-  return `${MONTH_SHORT[d.getMonth()]} ${d.getFullYear()}`;
-}
+function fmtNum(n) { return new Intl.NumberFormat('id-ID').format(Math.round(n)); }
+function set(id, val) { const el=document.getElementById(id); if(el) el.textContent=val; }
 
 // ─────────────────────────────────────
-// SIDEBAR COLLAPSE → CHART RESIZE
+// AUTO REFRESH
 // ─────────────────────────────────────
-(function initSidebarResizeObserver() {
-  const sidebar = document.getElementById('sidebar');
-  if (!sidebar || typeof ResizeObserver === 'undefined') return;
-  const observer = new ResizeObserver(() => {
-    // Tunggu transisi CSS selesai baru resize chart
-    setTimeout(() => {
-      ['chart-susut', 'chart-kwh-jual', 'spark-susut'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el && el.children.length) Plotly.Plots.resize(el);
-      });
-    }, 280); // sedikit lebih dari durasi transisi 0.25s
-  });
-  observer.observe(sidebar);
-})();
-
-// ─────────────────────────────────────
-// BOOT
-// ─────────────────────────────────────
-document.addEventListener('DOMContentLoaded', loadData);
-setInterval(loadData, 300_000); // refresh tiap 5 menit
+setInterval(loadData, 300_000);
