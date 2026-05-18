@@ -1,28 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Dashboard – Susut Energi{% endblock %}
 
-{% block head %}
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-{% endblock %}
-
 {% block content %}
-<div class="dash-shell">
+<div class="page-wrap">
 
-  <!-- ══════════════════════════════════════
-       TOPBAR
-  ══════════════════════════════════════ -->
+  <!-- ── TOPBAR ─────────────────────────────────────── -->
   <div class="topbar">
-    <div class="tbar-left">
-      <div class="tbar-eyebrow">Monitoring Sistem Distribusi</div>
-      <h1 class="tbar-title">Dashboard Susut Energi</h1>
+    <div class="topbar-left">
+      <div class="page-eyebrow">Monitoring Sistem Distribusi</div>
+      <h1 class="page-title">Dashboard Susut Energi</h1>
     </div>
-    <div class="tbar-right">
-      <div class="period-pill">
+    <div class="topbar-right">
+      <div class="live-badge">
         <span class="live-dot"></span>
         <span id="live-label">Live</span>
       </div>
-      <div class="filter-bar-pill">
-        <label class="fp-label">Periode</label>
+
+      <!-- Filter periode + tahun dalam satu pill -->
+      <div class="filter-pill">
+        <span class="fp-label">Periode</span>
         <select id="periode" class="fp-select">
           <option value="januari">Januari</option>
           <option value="februari">Februari</option>
@@ -42,169 +38,175 @@
           <option value="tw4">TW IV</option>
           <option value="kumulatif">Kumulatif YTD</option>
         </select>
+        <div class="fp-sep"></div>
+        <span class="fp-label">Tahun</span>
         <select id="tahun" class="fp-select"></select>
-        <button id="reset-filter" class="fp-btn">
+        <button id="btn-reset" class="fp-btn" title="Reset filter">
           <i class="ti ti-refresh" aria-hidden="true"></i>
         </button>
       </div>
-      <button id="export-btn" class="fp-btn-outline">
+
+      <button id="btn-export" class="btn-outline">
         <i class="ti ti-download" aria-hidden="true"></i>
-        Export
+        Export CSV
       </button>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════
-       METRIC CARDS
-  ══════════════════════════════════════ -->
-  <div class="mc-grid" id="metric-cards">
+  <!-- ── METRIC CARDS ───────────────────────────────── -->
+  <div class="metric-grid">
 
     <!-- Susut % -->
-    <div class="mc mc-danger">
-      <div class="mc-accent"></div>
-      <div class="mc-inner">
-        <div class="mc-hd">
-          <span class="mc-lbl">Susut Energi</span>
-          <div class="mc-icon mc-icon-danger">
-            <i class="ti ti-trending-down" aria-hidden="true"></i>
-          </div>
+    <div class="metric-card mc-danger">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Susut Energi</span>
+          <div class="mc-icon"><i class="ti ti-trending-down" aria-hidden="true"></i></div>
         </div>
-        <div class="mc-val" id="susut-persen">—</div>
-        <div class="mc-sub">
-          <span>vs target 1.5%</span>
+        <div class="mc-value" id="val-susut-pct">—</div>
+        <div class="mc-meta">
+          <span class="mc-meta-text">vs target 1.5%</span>
           <span class="mc-badge" id="badge-susut">—</span>
         </div>
-        <div class="mc-spark-wrap">
-          <canvas id="spark-susut-pct" role="img" aria-label="Sparkline tren susut persen">Tren susut 5 bulan terakhir</canvas>
+        <!-- FIX: wrapper height eksplisit -->
+        <div class="mc-spark">
+          <canvas id="spk-susut-pct"
+                  role="img"
+                  aria-label="Sparkline tren susut persen 5 bulan terakhir">
+            Tren susut 5 bulan
+          </canvas>
         </div>
       </div>
     </div>
 
     <!-- kWh Masuk -->
-    <div class="mc mc-blue">
-      <div class="mc-accent"></div>
-      <div class="mc-inner">
-        <div class="mc-hd">
-          <span class="mc-lbl">kWh Masuk (MU)</span>
-          <div class="mc-icon mc-icon-blue">
-            <i class="ti ti-bolt" aria-hidden="true"></i>
-          </div>
+    <div class="metric-card mc-blue">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">kWh Masuk (MU)</span>
+          <div class="mc-icon"><i class="ti ti-bolt" aria-hidden="true"></i></div>
         </div>
-        <div class="mc-val" id="kwh-beli">—</div>
-        <div class="mc-sub">
-          <span id="label-periode-1">—</span>
-          <span class="mc-badge mc-badge-up" id="badge-mu">—</span>
+        <div class="mc-value" id="val-mu">—</div>
+        <div class="mc-meta">
+          <span class="mc-meta-text" id="lbl-periode-1">—</span>
+          <span class="mc-badge" id="badge-mu">—</span>
         </div>
-        <div class="mc-spark-wrap">
-          <canvas id="spark-mu" role="img" aria-label="Sparkline tren kWh masuk">Tren kWh masuk 5 bulan terakhir</canvas>
+        <div class="mc-spark">
+          <canvas id="spk-mu" role="img" aria-label="Sparkline tren kWh masuk">Tren kWh masuk</canvas>
         </div>
       </div>
     </div>
 
     <!-- kWh Jual -->
-    <div class="mc mc-purple">
-      <div class="mc-accent"></div>
-      <div class="mc-inner">
-        <div class="mc-hd">
-          <span class="mc-lbl">kWh Jual (Penyulang)</span>
-          <div class="mc-icon mc-icon-purple">
-            <i class="ti ti-plug" aria-hidden="true"></i>
-          </div>
+    <div class="metric-card mc-green">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">kWh Jual (Penyulang)</span>
+          <div class="mc-icon"><i class="ti ti-plug" aria-hidden="true"></i></div>
         </div>
-        <div class="mc-val" id="kwh-jual">—</div>
-        <div class="mc-sub">
-          <span id="label-periode-2">—</span>
+        <div class="mc-value" id="val-py">—</div>
+        <div class="mc-meta">
+          <span class="mc-meta-text" id="lbl-periode-2">—</span>
         </div>
-        <div class="mc-spark-wrap">
-          <canvas id="spark-py" role="img" aria-label="Sparkline tren kWh penyulang">Tren kWh penyulang 5 bulan terakhir</canvas>
+        <div class="mc-spark">
+          <canvas id="spk-py" role="img" aria-label="Sparkline tren kWh penyulang">Tren kWh penyulang</canvas>
         </div>
       </div>
     </div>
 
     <!-- Susut kWh -->
-    <div class="mc mc-amber">
-      <div class="mc-accent"></div>
-      <div class="mc-inner">
-        <div class="mc-hd">
-          <span class="mc-lbl">Susut (kWh)</span>
-          <div class="mc-icon mc-icon-amber">
-            <i class="ti ti-minus" aria-hidden="true"></i>
-          </div>
+    <div class="metric-card mc-amber">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Susut (kWh)</span>
+          <div class="mc-icon"><i class="ti ti-minus" aria-hidden="true"></i></div>
         </div>
-        <div class="mc-val" id="susut-kwh">—</div>
-        <div class="mc-sub">
-          <span id="label-periode-3">—</span>
+        <div class="mc-value" id="val-susut-kwh">—</div>
+        <div class="mc-meta">
+          <span class="mc-meta-text" id="lbl-periode-3">—</span>
         </div>
-        <div class="mc-spark-wrap">
-          <canvas id="spark-susut-kwh" role="img" aria-label="Sparkline tren susut kWh">Tren susut kWh 5 bulan terakhir</canvas>
+        <div class="mc-spark">
+          <canvas id="spk-susut-kwh" role="img" aria-label="Sparkline tren susut kWh">Tren susut kWh</canvas>
         </div>
       </div>
     </div>
 
-  </div>
+  </div><!-- /metric-grid -->
 
-  <!-- ══════════════════════════════════════
-       CHART UTAMA — FULL WIDTH
-  ══════════════════════════════════════ -->
-  <div class="chart-panel">
-    <div class="cp-hd">
+  <!-- ── CHART TREN SUSUT (full width) ──────────────── -->
+  <div class="panel panel-full">
+    <div class="panel-header">
       <div>
-        <div class="cp-title">Tren Susut Energi</div>
-        <div class="cp-sub">Persentase kehilangan energi per bulan</div>
+        <div class="panel-title">Tren Susut Energi</div>
+        <div class="panel-sub">Persentase kehilangan per bulan · garis merah putus = target 1.5%</div>
       </div>
-      <div class="cp-right">
-        <div class="legend-row">
-          <span class="ld"><span class="ldot" style="background:#4f7df4"></span>Susut %</span>
-          <span class="ld"><span class="ldot-dash"></span>Target 1.5%</span>
+      <div class="panel-actions">
+        <div class="chart-legend">
+          <div class="cl-item"><span class="cl-dot" style="background:#2563eb"></span>Susut %</div>
+          <div class="cl-item"><span class="cl-dash"></span>Target</div>
         </div>
-        <div class="filter-tabs">
-          <div class="ftab" data-range="3">3B</div>
-          <div class="ftab active" data-range="6">6B</div>
-          <div class="ftab" data-range="12">12B</div>
+        <div class="range-tabs">
+          <button class="range-tab" data-range="3">3B</button>
+          <button class="range-tab active" data-range="6">6B</button>
+          <button class="range-tab" data-range="12">12B</button>
         </div>
       </div>
     </div>
-    <div class="chart-canvas-wrap" style="position:relative">
-      <div class="float-popup" id="float-popup">
-        <div class="fp-bulan" id="fp-bulan">—</div>
-        <div class="fp-val" id="fp-val">—</div>
-        <div class="fp-chg" id="fp-chg">—</div>
+    <!-- FIX: popup dibungkus di luar chart-box agar position absolute bekerja -->
+    <div class="chart-popup-wrap">
+      <div class="chart-popup" id="float-popup">
+        <div class="cp-label" id="cp-bulan">—</div>
+        <div class="cp-value" id="cp-val">—</div>
+        <div class="cp-delta" id="cp-delta">—</div>
       </div>
-      <div style="position:relative;height:200px">
-        <canvas id="chart-susut" role="img" aria-label="Grafik tren susut energi per bulan">Susut: Jan 1.45%, Feb 1.62%, Mar 1.38%, Apr 1.51%, Mei 1.78%</canvas>
+      <!-- FIX: height eksplisit pada wrapper, bukan canvas -->
+      <div class="chart-box" style="height:210px">
+        <canvas id="chart-susut"
+                role="img"
+                aria-label="Grafik tren susut energi per bulan">
+          Susut: Jan 1.45%, Feb 1.62%, Mar 1.38%, Apr 1.51%, Mei 1.78%
+        </canvas>
       </div>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════
-       ROW: CHART kWh JUAL + TABEL DETAIL
-  ══════════════════════════════════════ -->
-  <div class="two-panel">
+  <!-- ── ROW: kWh JUAL + TABEL ──────────────────────── -->
+  <div class="two-col">
 
-    <div class="chart-panel" style="margin-bottom:0">
-      <div class="cp-hd">
+    <!-- Chart kWh Jual -->
+    <div class="panel">
+      <div class="panel-header">
         <div>
-          <div class="cp-title">kWh Jual per Kategori</div>
-          <div class="cp-sub">TT · TM · TR per bulan</div>
+          <div class="panel-title">kWh Jual per Kategori Tarif</div>
+          <div class="panel-sub">TT · TM · TR per bulan</div>
         </div>
-        <div class="legend-row">
-          <span class="ld"><span class="ldot" style="background:#4f7df4"></span>TT</span>
-          <span class="ld"><span class="ldot" style="background:#10b981"></span>TM</span>
-          <span class="ld"><span class="ldot" style="background:#f59e0b"></span>TR</span>
+        <div class="chart-legend">
+          <div class="cl-item"><span class="cl-dot" style="background:#2563eb"></span>TT</div>
+          <div class="cl-item"><span class="cl-dot" style="background:#16a34a"></span>TM</div>
+          <div class="cl-item"><span class="cl-dot" style="background:#d97706"></span>TR</div>
         </div>
       </div>
-      <div style="position:relative;height:200px">
-        <canvas id="chart-kwh-jual" role="img" aria-label="Bar chart kWh jual per kategori tarif per bulan">Distribusi kWh jual per kategori TT, TM, TR</canvas>
+      <div class="chart-box" style="height:220px">
+        <canvas id="chart-jual"
+                role="img"
+                aria-label="Bar chart kWh jual kategori TT TM TR per bulan">
+          Distribusi kWh jual per kategori tarif
+        </canvas>
       </div>
     </div>
 
+    <!-- Tabel detail -->
     <div class="panel">
-      <div class="panel-hd">
-        <div class="cp-title">Detail Bulanan</div>
-        <div class="pill-row" id="status-pills"></div>
+      <div class="panel-header">
+        <div class="panel-title">Detail Susut Bulanan</div>
+        <div class="pills-row" id="status-pills"></div>
       </div>
-      <div class="tscroll">
-        <table class="dtbl" id="table-detail">
+      <div class="table-scroll">
+        <table class="data-table" id="tbl-detail">
           <thead>
             <tr>
               <th>Bulan</th>
@@ -221,12 +223,11 @@
       </div>
     </div>
 
-  </div>
+  </div><!-- /two-col -->
 
-</div>
+</div><!-- /page-wrap -->
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}

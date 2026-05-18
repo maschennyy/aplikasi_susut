@@ -1,184 +1,164 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Susut Listrik{% endblock %}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Susut Energi{% endblock %}</title>
+
+  <!-- Font: Plus Jakarta Sans (display) + Geist Mono (angka) -->
+  <!-- Diload via bunny.net sebagai fallback CSP-friendly -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Tabler Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+  {% block head %}{% endblock %}
 </head>
 <body>
-    <div class="app-layout">
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <span class="sidebar-brand" id="brand-text">
-                    <span class="sidebar-brand-icon">⚡</span>
-                    <span class="sidebar-brand-text">
-                        <span class="brand-name">SusutGuard</span>
-                        <span class="brand-sub">Monitoring</span>
-                    </span>
-                </span>
-                <button class="sidebar-toggle" id="sidebar-toggle">☰</button>
-            </div>
-            <nav class="sidebar-nav">
-                <span class="nav-group-label">Utama</span>
-                
-                <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.path == '/' %}active{% endif %}">
-                    <span class="nav-icon">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
-                    </span>
-                    <span class="nav-text">Dashboard</span>
-                </a>
-                
-                <a href="{{ url_for('halaman_penyulang') }}" class="nav-item {% if request.path == '/penyulang' %}active{% endif %}">
-                    <span class="nav-icon">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                    </span>
-                    <span class="nav-text">Penyulang</span>
-                </a>
-                
-                <a href="#" class="nav-item">
-                    <span class="nav-icon">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    </span>
-                    <span class="nav-text">Laporan</span>
-                </a>
 
-                <span class="nav-group-label" style="margin-top: 15px;">Pengaturan</span>
-                <button id="dark-mode-toggle" class="nav-item" style="background: transparent; border: none; width: 100%; text-align: left; cursor: pointer; color: inherit;">
-                    <span class="nav-icon" id="dark-mode-icon">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                    </span>
-                    <span class="nav-text" id="dark-mode-text">Mode Gelap</span>
-                </button>
-            </nav>
-            <div class="sidebar-footer">
-                <div class="sidebar-footer-info">
-                    <span class="sidebar-footer-dot"></span>
-                    <span class="sidebar-footer-text">Sistem Aktif</span>
-                </div>
-            </div>
-        </aside>
-        <main class="main-content" id="main-content">
-            {% block content %}{% endblock %}
-        </main>
+<div class="app-layout">
+
+  <!-- ══════════════════════════════════════
+       SIDEBAR
+  ══════════════════════════════════════ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-top">
+
+      <!-- Brand -->
+      <div class="sb-brand">
+        <div class="sb-logo">
+          <i class="ti ti-bolt" aria-hidden="true"></i>
+        </div>
+        <div class="sb-brand-text">
+          <span class="sb-brand-name">EnergySus</span>
+          <span class="sb-brand-sub">UP3 Tangerang</span>
+        </div>
+        <button class="sb-collapse-btn" id="sb-toggle" aria-label="Toggle sidebar">
+          <i class="ti ti-layout-sidebar-left-collapse"></i>
+        </button>
+      </div>
+
+      <!-- User -->
+      <div class="sb-user">
+        <div class="sb-avatar">AD</div>
+        <div class="sb-user-info">
+          <span class="sb-user-name">Admin PLN</span>
+          <span class="sb-user-role">Supervisor UP3</span>
+        </div>
+      </div>
+
+      <!-- Nav -->
+      <nav class="sb-nav">
+        <span class="sb-nav-section">Monitoring</span>
+        <a href="/" class="sb-nav-item {% if request.path == '/' %}active{% endif %}" data-tip="Dashboard">
+          <i class="ti ti-layout-dashboard" aria-hidden="true"></i>
+          <span class="sb-nav-label">Dashboard</span>
+        </a>
+        <a href="/penyulang" class="sb-nav-item {% if request.path == '/penyulang' %}active{% endif %}" data-tip="Penyulang">
+          <i class="ti ti-plug" aria-hidden="true"></i>
+          <span class="sb-nav-label">kWh Penyulang</span>
+        </a>
+        <a href="/meter-gi" class="sb-nav-item {% if request.path == '/meter-gi' %}active{% endif %}" data-tip="Main Meter">
+          <i class="ti ti-gauge" aria-hidden="true"></i>
+          <span class="sb-nav-label">Main Meter GI</span>
+        </a>
+
+        <span class="sb-nav-section">Analisis</span>
+        <a href="/deviasi" class="sb-nav-item {% if request.path == '/deviasi' %}active{% endif %}" data-tip="Deviasi">
+          <i class="ti ti-chart-bar" aria-hidden="true"></i>
+          <span class="sb-nav-label">Analisis Deviasi</span>
+        </a>
+        <a href="/proporsional" class="sb-nav-item {% if request.path == '/proporsional' %}active{% endif %}" data-tip="Proporsional">
+          <i class="ti ti-percentage" aria-hidden="true"></i>
+          <span class="sb-nav-label">Detail Proporsional</span>
+        </a>
+        <a href="/transfer" class="sb-nav-item {% if request.path == '/transfer' %}active{% endif %}" data-tip="Transfer EXIM">
+          <i class="ti ti-arrows-exchange" aria-hidden="true"></i>
+          <span class="sb-nav-label">Transfer EXIM</span>
+        </a>
+
+        <span class="sb-nav-section">Laporan</span>
+        <a href="/rekap" class="sb-nav-item {% if request.path == '/rekap' %}active{% endif %}" data-tip="Rekapitulasi">
+          <i class="ti ti-report" aria-hidden="true"></i>
+          <span class="sb-nav-label">Rekapitulasi</span>
+        </a>
+        <a href="/upload" class="sb-nav-item {% if request.path == '/upload' %}active{% endif %}" data-tip="Upload NKWh">
+          <i class="ti ti-upload" aria-hidden="true"></i>
+          <span class="sb-nav-label">Upload NKWh</span>
+        </a>
+      </nav>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            const sidebar = document.getElementById("sidebar");
-            const mainContent = document.getElementById("main-content");
-            const sidebarToggle = document.getElementById("sidebar-toggle");
-            
-            // Elemen Dark Mode
-            const darkModeToggle = document.getElementById("dark-mode-toggle");
-            const darkModeIcon = document.getElementById("dark-mode-icon");
-            const darkModeText = document.getElementById("dark-mode-text");
 
-            // ═══════════════════════════════════════
-            // 1. LOGIKA UTAMA SIDEBAR INITIALIZATION
-            // ═══════════════════════════════════════
-            const isCollapsed = localStorage.getItem("sidebar-collapsed") === "true";
-            sidebar.classList.add("no-transition");
-            if (mainContent) mainContent.classList.add("no-transition");
+    <!-- Footer sidebar -->
+    <div class="sb-footer">
+      <!-- Mini stats -->
+      <div class="sb-mini-stats">
+        <div class="sb-mini-stat">
+          <span class="sms-val">5</span>
+          <span class="sms-lbl">GI Aktif</span>
+        </div>
+        <div class="sb-mini-stat">
+          <span class="sms-val danger">2</span>
+          <span class="sms-lbl">Alert</span>
+        </div>
+      </div>
 
-            if (isCollapsed) {
-                sidebar.classList.add("collapsed");
-                if (mainContent) mainContent.classList.add("collapsed");
-            } else {
-                sidebar.classList.remove("collapsed");
-                if (mainContent) mainContent.classList.remove("collapsed");
-            }
+      <!-- Dark mode toggle -->
+      <button class="sb-theme-btn" id="theme-toggle" aria-label="Toggle dark mode">
+        <i class="ti ti-sun" id="theme-icon" aria-hidden="true"></i>
+        <span class="sb-nav-label">Light Mode</span>
+      </button>
+    </div>
+  </aside>
 
-            setTimeout(function() {
-                sidebar.classList.remove("no-transition");
-                if (mainContent) mainContent.classList.remove("no-transition");
-            }, 50);
+  <!-- ══════════════════════════════════════
+       MAIN CONTENT
+  ══════════════════════════════════════ -->
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
 
-            // ═══════════════════════════════════════
-            // 2. LOGIKA UTAMA INITIALIZATION DARK MODE
-            // ═══════════════════════════════════════
-            const isDarkModeActive = localStorage.getItem("dark-mode") === "true";
-            
-            function updateDarkModeUI(active) {
-                if (active) {
-                    document.body.classList.add("dark");
-                    if (darkModeText) darkModeText.textContent = "Mode Terang";
-                    if (darkModeIcon) {
-                        darkModeIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.22" x2="5.64" y2="17.78"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
-                    }
-                } else {
-                    document.body.classList.remove("dark");
-                    if (darkModeText) darkModeText.textContent = "Mode Gelap";
-                    if (darkModeIcon) {
-                        darkModeIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
-                    }
-                }
-                
-                // Re-render chart agar skema warna grid/font Plotly berubah mengikuti mode
-                if (typeof triggerChartResize === "function") {
-                    triggerChartResize();
-                } else if (typeof Plotly !== 'undefined') {
-                    // Jika di halaman dashboard, panggil fungsi update theme bawaan dashboard.js jika ada
-                    window.dispatchEvent(new Event('resize'));
-                }
-            }
+</div>
 
-            // Terapkan state dark mode saat load awal halaman
-            updateDarkModeUI(isDarkModeActive);
+<!-- Chart.js — WAJIB load sebelum dashboard.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 
-            // Event listener saat tombol dark mode diklik
-            if (darkModeToggle) {
-                darkModeToggle.addEventListener("click", function() {
-                    const currentDarkStatus = document.body.classList.contains("dark");
-                    const newDarkStatus = !currentDarkStatus;
-                    localStorage.setItem("dark-mode", newDarkStatus);
-                    updateDarkModeUI(newDarkStatus);
-                    
-                    // Jika fungsi reloadData dari dashboard.js atau penyulang.js ada, panggil untuk memperbarui warna chart
-                    if (typeof loadData === "function") {
-                        loadData();
-                    }
-                });
-            }
+<!-- Sidebar JS -->
+<script>
+(function () {
+  const sidebar = document.getElementById('sidebar');
+  const toggle  = document.getElementById('sb-toggle');
+  const themeBtn= document.getElementById('theme-toggle');
+  const themeIco= document.getElementById('theme-icon');
 
-            // ═══════════════════════════════════════
-            // 3. EVENT RESIZE GRAFIK (PLOTLY)
-            // ═══════════════════════════════════════
-            function triggerChartResize() {
-                const plotlyCharts = document.querySelectorAll('.js-plotly-plot');
-                plotlyCharts.forEach(chart => {
-                    if (typeof Plotly !== 'undefined') {
-                        // Update layout dinamis sebelum resize jika fungsi theme tersedia
-                        if (typeof chartTheme === 'function') {
-                            const t = chartTheme();
-                            Plotly.relayout(chart, {
-                                paper_bgcolor: t.paper,
-                                plot_bgcolor:  t.plot,
-                                font:          { color: t.font },
-                                xaxis:         { gridcolor: t.grid, zerolinecolor: t.grid, color: t.font },
-                                yaxis:         { gridcolor: t.grid, zerolinecolor: t.grid, color: t.font }
-                            });
-                        }
-                        Plotly.Plots.resize(chart);
-                    }
-                });
-                window.dispatchEvent(new Event('resize'));
-            }
+  // Restore state
+  if (localStorage.getItem('sb-collapsed') === '1') sidebar.classList.add('collapsed');
+  if (localStorage.getItem('theme') === 'dark') {
+    document.body.classList.add('dark');
+    themeIco.className = 'ti ti-moon';
+  }
 
-            // Action click toggle sidebar
-            sidebarToggle.addEventListener("click", function() {
-                sidebar.classList.toggle("collapsed");
-                if (mainContent) mainContent.classList.toggle("collapsed");
+  toggle.addEventListener('click', function () {
+    sidebar.classList.toggle('collapsed');
+    localStorage.setItem('sb-collapsed', sidebar.classList.contains('collapsed') ? '1' : '0');
+  });
 
-                const currentStatus = sidebar.classList.contains("collapsed");
-                localStorage.setItem("sidebar-collapsed", currentStatus);
+  themeBtn.addEventListener('click', function () {
+    const dark = document.body.classList.toggle('dark');
+    themeIco.className = dark ? 'ti ti-moon' : 'ti ti-sun';
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+    // Re-render charts jika ada
+    if (typeof window.rerenderCharts === 'function') window.rerenderCharts();
+  });
+})();
+</script>
 
-                triggerChartResize();
-                setTimeout(triggerChartResize, 100);
-            });
-        });
-    </script>
+{% block scripts %}{% endblock %}
+
 </body>
 </html>
