@@ -123,7 +123,8 @@ img, svg { display: block; }
   height: 100vh;
   position: sticky;
   top: 0;
-  overflow: hidden;
+  overflow: hidden;           /* clip horizontal untuk animasi width */
+  overflow-y: auto;           /* scroll vertikal tetap bisa */
   transition: width .22s cubic-bezier(.4,0,.2,1),
               min-width .22s cubic-bezier(.4,0,.2,1);
   flex-shrink: 0;
@@ -138,10 +139,10 @@ img, svg { display: block; }
 .sb-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 16px 14px 14px;
+  gap: 8px;
+  padding: 14px 12px;
   border-bottom: 1px solid var(--bdr2);
-  position: relative;
+  flex-shrink: 0;
 }
 .sb-logo {
   width: 32px;
@@ -166,21 +167,26 @@ img, svg { display: block; }
 .sb-brand-name { display: block; font-size: .88rem; font-weight: 700; color: var(--t1); letter-spacing: -.01em; }
 .sb-brand-sub  { display: block; font-size: .7rem; color: var(--t3); margin-top: 1px; }
 .sb-collapse-btn {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
+  /* Tombol SELALU visible — flex item biasa, tidak absolute */
+  flex-shrink: 0;
+  margin-left: auto;          /* dorong ke kanan */
   background: var(--bg2);
   border: none;
   border-radius: var(--r-sm);
-  width: 24px; height: 24px;
+  width: 26px; height: 26px;
   display: flex; align-items: center; justify-content: center;
   color: var(--t2); font-size: 14px;
-  transition: background .15s, opacity .18s;
-  flex-shrink: 0;
+  transition: background .15s;
+  cursor: pointer;
 }
-.sidebar.collapsed .sb-collapse-btn { opacity: 0; pointer-events: none; }
 .sb-collapse-btn:hover { background: var(--blue-dim2); color: var(--blue); }
+/* ikon rotate saat collapsed */
+.sb-collapse-btn .ti {
+  transition: transform .22s cubic-bezier(.4,0,.2,1);
+  display: block;
+  pointer-events: none;       /* klik diteruskan ke button parent */
+}
+.sidebar.collapsed .sb-collapse-btn .ti { transform: rotate(180deg); }
 
 /* user */
 .sb-user {
@@ -595,7 +601,10 @@ tr.row-warn   td { background: var(--amber-dim) !important; }
 ───────────────────────────────────────────────────── */
 @media (max-width: 1280px) {
   .page-wrap          { padding: 20px; }
-  /* .metric-grid        { grid-template-columns: repeat(2, minmax(0,1fr)); } */
+  /* metric-grid tetap 4 kolom sampai 800px */
+}
+@media (max-width: 800px) {
+  .metric-grid        { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
 @media (max-width: 1024px) {
   .two-col            { grid-template-columns: 1fr; }

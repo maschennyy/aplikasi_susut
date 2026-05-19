@@ -25,6 +25,11 @@ const charts = {};
 
 /* ── BOOT ──────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
+  // Guard: pastikan Chart.js sudah load (di-include di base.html sebelum script ini)
+  if (typeof Chart === 'undefined') {
+    console.error('[dashboard.js] Chart.js belum load! Pastikan CDN ada di base.html.');
+    return;
+  }
   initTahunSelect();
   bindEvents();
   loadData();
@@ -118,8 +123,8 @@ function updateDashboard() {
 
 /* ── METRIC CARDS ──────────────────────────────────── */
 function renderMetricCards(agg, yd) {
-  const p = agg?.persentase_susut ?? null;
-  const s = p == null ? null : p > TARGET ? 'danger' : p > TARGET*.88 ? 'warn' : 'ok';
+  const p = (agg != null && agg.persentase_susut != null) ? agg.persentase_susut : null;
+  const s = p === null ? null : p > TARGET ? 'danger' : p > TARGET * .88 ? 'warn' : 'ok';
 
   setText('val-susut-pct',  p    != null ? p.toFixed(2) + '%'     : '—');
   setText('val-mu',         agg?.meter_utama    != null ? fmtN(agg.meter_utama)     : '—');
@@ -144,17 +149,20 @@ function renderMetricCards(agg, yd) {
     bd2.style.color      = d >= 0 ? 'var(--blue)'     : 'var(--red)';
   }
 
-  /* floating popup */
+  /* floating popup — safe null checks */
   if (last) {
     const dt = new Date(last.tanggal);
     setText('cp-bulan', MO_SHORT[dt.getMonth()] + ' ' + dt.getFullYear());
     setText('cp-val',   last.persentase_susut.toFixed(2) + '%');
-    if (prev) {
-      const d    = last.persentase_susut - prev.persentase_susut;
-      const el   = qid('cp-delta');
-      if (el) {
-        el.textContent = (d >= 0 ? '↑ +' : '↓ ') + Math.abs(d).toFixed(2) + '% dari ' + MO_SHORT[new Date(prev.tanggal).getMonth()];
-        el.style.color = d > 0 ? 'var(--red)' : 'var(--green)';
+    const cpDelta = qid('cp-delta');
+    if (cpDelta) {
+      if (prev && typeof prev.persentase_susut === 'number') {
+        const d = last.persentase_susut - prev.persentase_susut;
+        cpDelta.textContent = (d >= 0 ? '↑ +' : '↓ ') + Math.abs(d).toFixed(2) + '% dari ' + MO_SHORT[new Date(prev.tanggal).getMonth()];
+        cpDelta.style.color = d > 0 ? 'var(--red)' : 'var(--green)';
+      } else {
+        cpDelta.textContent = 'Tidak ada data pembanding';
+        cpDelta.style.color = 'var(--t3)';
       }
     }
   }
