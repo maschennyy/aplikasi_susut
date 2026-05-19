@@ -623,3 +623,136 @@ tr.row-warn   td { background: var(--amber-dim) !important; }
 @media (max-width: 480px) {
   .metric-grid        { grid-template-columns: 1fr; }
 }
+
+/* ─────────────────────────────────────────────────────
+   12. SB-TOP — tidak boleh clip konten
+───────────────────────────────────────────────────── */
+.sb-top {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-x: hidden;  /* clip teks saat collapse */
+  overflow-y: auto;    /* scroll jika nav panjang */
+  min-height: 0;
+}
+
+/* ─────────────────────────────────────────────────────
+   13. FLASH MESSAGES (dari Flask flash())
+───────────────────────────────────────────────────── */
+.flash-wrap {
+  padding: 0 28px;
+  padding-top: 16px;
+}
+.flash {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  font-size: .82rem;
+  font-weight: 500;
+  margin-bottom: 8px;
+  border: 1px solid transparent;
+  transition: opacity .3s;
+  position: relative;
+}
+.flash i:first-child { font-size: 17px; flex-shrink: 0; }
+.flash span          { flex: 1; }
+.flash-close {
+  background: none; border: none;
+  color: inherit; opacity: .6;
+  padding: 2px; cursor: pointer;
+  font-size: 15px; display: flex; align-items: center;
+}
+.flash-close:hover { opacity: 1; }
+
+.flash-success { background: var(--green-dim); color: var(--green); border-color: rgba(22,163,74,.2); }
+.flash-warning { background: var(--amber-dim); color: var(--amber); border-color: rgba(217,119,6,.2); }
+.flash-danger  { background: var(--red-dim);   color: var(--red);   border-color: rgba(220,38,38,.2); }
+.flash-info    { background: var(--blue-dim);  color: var(--blue);  border-color: rgba(37,99,235,.2); }
+
+/* ─────────────────────────────────────────────────────
+   14. TOAST (notifikasi dari JS window.showToast)
+───────────────────────────────────────────────────── */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 340px;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: var(--r-md);
+  font-size: .82rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  box-shadow: var(--sh-lg);
+  background: var(--card);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity .25s, transform .25s;
+}
+.toast-show { opacity: 1; transform: translateY(0); }
+.toast i:first-child { font-size: 17px; flex-shrink: 0; }
+.toast span          { flex: 1; }
+.toast-close {
+  background: none; border: none;
+  color: inherit; opacity: .5;
+  padding: 2px; cursor: pointer;
+  font-size: 14px; display: flex; align-items: center;
+}
+.toast-close:hover { opacity: 1; }
+
+.toast-success { background: var(--green-dim); color: var(--green); border-color: rgba(22,163,74,.2); }
+.toast-warning { background: var(--amber-dim); color: var(--amber); border-color: rgba(217,119,6,.2); }
+.toast-error   { background: var(--red-dim);   color: var(--red);   border-color: rgba(220,38,38,.2); }
+.toast-info    { background: var(--blue-dim);  color: var(--blue);  border-color: rgba(37,99,235,.2); }
+
+/* ─────────────────────────────────────────────────────
+   15. COMING SOON PLACEHOLDER
+───────────────────────────────────────────────────── */
+.coming-soon-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+.cs-icon {
+  width: 64px; height: 64px;
+  background: var(--blue-dim);
+  border-radius: var(--r-xl);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; color: var(--blue);
+  margin-bottom: 20px;
+}
+.cs-title {
+  font-size: 1.1rem; font-weight: 700;
+  color: var(--t1); margin-bottom: 8px;
+}
+.cs-desc {
+  font-size: .85rem; color: var(--t2);
+  line-height: 1.6; max-width: 380px;
+}
+
+/* ─────────────────────────────────────────────────────
+   16. LOADING SKELETON (untuk state loading data)
+───────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg,
+    var(--bg2) 25%, var(--bg) 50%, var(--bg2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--r-sm);
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+.skeleton-text { height: 14px; margin-bottom: 6px; }
+.skeleton-val  { height: 32px; margin-bottom: 8px; width: 60%; }

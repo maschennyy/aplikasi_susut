@@ -1,90 +1,27 @@
 {% extends "base.html" %}
-{% block title %}Penyulang – Susut Listrik{% endblock %}
-
+{% block title %}{{ judul }} – Susut Energi{% endblock %}
 {% block content %}
-<div class="page-header">
-  <div class="page-header-left">
-    <div class="page-eyebrow">Manajemen Data</div>
-    <h1 class="page-title">Pemakaian Penyulang</h1>
-  </div>
-  <div class="page-header-right">
-    <div class="last-update" id="last-update-text">Memuat…</div>
-  </div>
-</div>
-
-<div class="filter-bar">
-  <div class="filter-group">
-    <div class="filter-item">
-      <label class="filter-label" for="filter-gardu">Gardu Induk</label>
-      <input 
-        type="text" 
-        id="filter-gardu" 
-        class="filter-select" 
-        list="gardu-list" 
-        placeholder="Ketik atau pilih..."
-        value="GI Cawang"
-        style="width: 220px;"
-      >
-      <datalist id="gardu-list">
-        <option value="GI Cawang">
-        <option value="GI Bekasi">
-        <option value="GI Depok">
-        <option value="GI Bogor">
-        <option value="GI Tangerang">
-      </datalist>
-    </div>
-    
-    <div class="filter-item">
-      <label class="filter-label" for="filter-tahun">Tahun</label>
-      <select id="filter-tahun" class="filter-select">
-      </select>
-    </div>
-    
-    <button id="btn-terapkan" class="btn-action">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-      Terapkan
-    </button>
-  </div>
-  
-  <div class="filter-actions">
-    <span id="info-jumlah" class="text-muted" style="font-size:0.82rem;"></span>
-  </div>
-</div>
-
-<div class="panel panel-full">
-  <div class="panel-header">
-    <div class="panel-title-group">
-      <h2 class="panel-title" id="tabel-title">Data Pemakaian – GI Cawang 2026</h2>
-      <span class="panel-subtitle">kWh per bulan untuk setiap penyulang</span>
+<div class="page-wrap">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-eyebrow">{{ eyebrow }}</div>
+      <h1 class="page-title">{{ judul }}</h1>
     </div>
   </div>
-  
-  <div class="table-scroll-container">
-    <table class="data-table data-table-striped" id="table-penyulang">
-      <thead>
-        <tr>
-          <th class="sticky-col">Penyulang</th>
-          <th class="text-right">Jan</th>
-          <th class="text-right">Feb</th>
-          <th class="text-right">Mar</th>
-          <th class="text-right">Apr</th>
-          <th class="text-right">Mei</th>
-          <th class="text-right">Jun</th>
-          <th class="text-right">Jul</th>
-          <th class="text-right">Ags</th>
-          <th class="text-right">Sep</th>
-          <th class="text-right">Okt</th>
-          <th class="text-right">Nov</th>
-          <th class="text-right">Des</th>
-          <th class="text-right sticky-col-right">Total</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+
+  <div class="coming-soon-wrap">
+    <div class="cs-icon">
+      <i class="ti ti-{{ icon }}" aria-hidden="true"></i>
+    </div>
+    <h2 class="cs-title">Halaman Sedang Dikembangkan</h2>
+    <p class="cs-desc">
+      {{ desc }}<br>
+      Halaman ini akan tersedia pada sesi pengembangan berikutnya.
+    </p>
+    <a href="{{ url_for('dashboard') }}" class="btn-outline" style="margin-top:16px;display:inline-flex">
+      <i class="ti ti-arrow-left" aria-hidden="true"></i>
+      Kembali ke Dashboard
+    </a>
   </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script src="{{ url_for('static', filename='js/penyulang.js') }}"></script>
 {% endblock %}

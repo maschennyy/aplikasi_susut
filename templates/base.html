@@ -5,18 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Susut Energi{% endblock %}</title>
 
-  <!-- Font: Plus Jakarta Sans (display) + Geist Mono (angka) -->
-  <!-- Diload via bunny.net sebagai fallback CSP-friendly -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-
-  <!-- Tabler Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
-
-  <!-- App CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -25,11 +18,15 @@
 
   <!-- ══════════════════════════════════════
        SIDEBAR
+       FIX: tidak ada overflow:hidden di sb-top
+       Tombol collapse adalah flex item biasa
   ══════════════════════════════════════ -->
   <aside class="sidebar" id="sidebar">
-    <div class="sb-top" style="display:flex;flex-direction:column;overflow:hidden">
 
-      <!-- Brand + Tombol Collapse (selalu visible) -->
+    <!-- Bagian atas sidebar: brand + user + nav -->
+    <div class="sb-top">
+
+      <!-- Brand -->
       <div class="sb-brand">
         <div class="sb-logo">
           <i class="ti ti-bolt" aria-hidden="true"></i>
@@ -38,9 +35,10 @@
           <span class="sb-brand-name">EnergySus</span>
           <span class="sb-brand-sub">UP3 Tangerang</span>
         </div>
-        <!-- Tombol ini flex item biasa → tidak di-clip overflow sidebar -->
-        <button class="sb-collapse-btn" id="sb-toggle" aria-label="Toggle sidebar" title="Collapse sidebar">
-          <i class="ti ti-chevrons-left"></i>
+        <!-- FIX: flex item biasa → tidak bisa di-clip -->
+        <button class="sb-collapse-btn" id="sb-toggle"
+                aria-label="Toggle sidebar" title="Collapse / Expand sidebar">
+          <i class="ti ti-chevrons-left" aria-hidden="true"></i>
         </button>
       </div>
 
@@ -53,117 +51,224 @@
         </div>
       </div>
 
-      <!-- Nav -->
-      <nav class="sb-nav">
+      <!-- Navigasi -->
+      <nav class="sb-nav" aria-label="Menu navigasi">
+
         <span class="sb-nav-section">Monitoring</span>
-        <a href="/" class="sb-nav-item {% if request.path == '/' %}active{% endif %}" data-tip="Dashboard">
+
+        <a href="{{ url_for('dashboard') }}"
+           class="sb-nav-item {{ 'active' if request.endpoint == 'dashboard' }}"
+           data-tip="Dashboard">
           <i class="ti ti-layout-dashboard" aria-hidden="true"></i>
           <span class="sb-nav-label">Dashboard</span>
         </a>
-        <a href="/penyulang" class="sb-nav-item {% if request.path == '/penyulang' %}active{% endif %}" data-tip="Penyulang">
+
+        <a href="{{ url_for('halaman_penyulang') }}"
+           class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_penyulang' }}"
+           data-tip="kWh Penyulang">
           <i class="ti ti-plug" aria-hidden="true"></i>
           <span class="sb-nav-label">kWh Penyulang</span>
         </a>
-        <a href="/meter-gi" class="sb-nav-item {% if request.path == '/meter-gi' %}active{% endif %}" data-tip="Main Meter">
+
+        <a href="{{ url_for('halaman_meter_gi') }}"
+           class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_meter_gi' }}"
+           data-tip="Main Meter GI">
           <i class="ti ti-gauge" aria-hidden="true"></i>
           <span class="sb-nav-label">Main Meter GI</span>
         </a>
 
         <span class="sb-nav-section">Analisis</span>
-        <a href="/deviasi" class="sb-nav-item {% if request.path == '/deviasi' %}active{% endif %}" data-tip="Deviasi">
+
+        <a href="{{ url_for('halaman_deviasi') }}"
+           class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_deviasi' }}"
+           data-tip="Analisis Deviasi">
           <i class="ti ti-chart-bar" aria-hidden="true"></i>
           <span class="sb-nav-label">Analisis Deviasi</span>
         </a>
-        <a href="/proporsional" class="sb-nav-item {% if request.path == '/proporsional' %}active{% endif %}" data-tip="Proporsional">
+
+        <a href="{{ url_for('halaman_proporsional') }}"
+           class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_proporsional' }}"
+           data-tip="Detail Proporsional">
           <i class="ti ti-percentage" aria-hidden="true"></i>
           <span class="sb-nav-label">Detail Proporsional</span>
         </a>
-        <a href="/transfer" class="sb-nav-item {% if request.path == '/transfer' %}active{% endif %}" data-tip="Transfer EXIM">
+
+        <a href="{{ url_for('halaman_transfer') }}"
+           class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_transfer' }}"
+           data-tip="Transfer EXIM">
           <i class="ti ti-arrows-exchange" aria-hidden="true"></i>
           <span class="sb-nav-label">Transfer EXIM</span>
         </a>
 
         <span class="sb-nav-section">Laporan</span>
-        <a href="/rekap" class="sb-nav-item {% if request.path == '/rekap' %}active{% endif %}" data-tip="Rekapitulasi">
+
+        <a href="{{ url_for('halaman_rekap') }}"
+           class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_rekap' }}"
+           data-tip="Rekapitulasi">
           <i class="ti ti-report" aria-hidden="true"></i>
           <span class="sb-nav-label">Rekapitulasi</span>
         </a>
-        <a href="/upload" class="sb-nav-item {% if request.path == '/upload' %}active{% endif %}" data-tip="Upload NKWh">
+
+        <a href="{{ url_for('halaman_upload') }}"
+           class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_upload' }}"
+           data-tip="Upload NKWh">
           <i class="ti ti-upload" aria-hidden="true"></i>
           <span class="sb-nav-label">Upload NKWh</span>
         </a>
-      </nav>
-    </div>
 
-    <!-- Footer sidebar -->
+      </nav>
+    </div><!-- /sb-top -->
+
+    <!-- Bagian bawah sidebar: mini stats + dark mode -->
     <div class="sb-footer">
-      <!-- Mini stats -->
       <div class="sb-mini-stats">
         <div class="sb-mini-stat">
-          <span class="sms-val">5</span>
+          <span class="sms-val" id="sb-stat-gi">—</span>
           <span class="sms-lbl">GI Aktif</span>
         </div>
         <div class="sb-mini-stat">
-          <span class="sms-val danger">2</span>
+          <span class="sms-val danger" id="sb-stat-alert">—</span>
           <span class="sms-lbl">Alert</span>
         </div>
       </div>
-
-      <!-- Dark mode toggle -->
       <button class="sb-theme-btn" id="theme-toggle" aria-label="Toggle dark mode">
         <i class="ti ti-sun" id="theme-icon" aria-hidden="true"></i>
-        <span class="sb-nav-label">Light Mode</span>
+        <span class="sb-nav-label" id="theme-label">Light Mode</span>
       </button>
     </div>
-  </aside>
+
+  </aside><!-- /sidebar -->
 
   <!-- ══════════════════════════════════════
        MAIN CONTENT
   ══════════════════════════════════════ -->
   <main class="main-content">
+
+    <!-- Flash messages dari Flask (misal setelah upload) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-wrap">
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}" role="alert">
+              <i class="ti ti-{{ 'check' if category == 'success' else 'alert-triangle' if category == 'warning' else 'x' }}" aria-hidden="true"></i>
+              <span>{{ message }}</span>
+              <button class="flash-close" onclick="this.parentElement.remove()" aria-label="Tutup">
+                <i class="ti ti-x" aria-hidden="true"></i>
+              </button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
     {% block content %}{% endblock %}
+
   </main>
 
-</div>
+</div><!-- /app-layout -->
 
-<!-- Chart.js — WAJIB load sebelum dashboard.js -->
+<!-- Toast container (untuk notifikasi JS) -->
+<div id="toast-container" aria-live="polite"></div>
+
+<!-- Chart.js — WAJIB load sebelum script halaman -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 
-<!-- Sidebar JS -->
+<!-- Core app JS -->
 <script>
-(function () {
-  const sidebar  = document.getElementById('sidebar');
-  const toggle   = document.getElementById('sb-toggle');
-  const themeBtn = document.getElementById('theme-toggle');
-  const themeIco = document.getElementById('theme-icon');
+/* ═══════════════════════════════════════════
+   APP CORE — sidebar, theme, toast, mini-stats
+   Berjalan di semua halaman via base.html
+═══════════════════════════════════════════ */
+(function AppCore() {
+  'use strict';
 
-  // ── Restore state dari localStorage ──
+  const sidebar   = document.getElementById('sidebar');
+  const sbToggle  = document.getElementById('sb-toggle');
+  const themeBtn  = document.getElementById('theme-toggle');
+  const themeIco  = document.getElementById('theme-icon');
+  const themeLbl  = document.getElementById('theme-label');
+
+  /* ── Restore state ────────────────────── */
   if (localStorage.getItem('sb-collapsed') === '1') {
     sidebar.classList.add('collapsed');
   }
   if (localStorage.getItem('theme') === 'dark') {
     document.body.classList.add('dark');
     if (themeIco) themeIco.className = 'ti ti-moon';
+    if (themeLbl) themeLbl.textContent = 'Dark Mode';
   }
 
-  // ── Toggle sidebar (collapse / expand) ──
-  // Tombol ini selalu visible karena CSS tidak menyembunyikannya
-  if (toggle) {
-    toggle.addEventListener('click', function () {
-      const isNowCollapsed = sidebar.classList.toggle('collapsed');
-      localStorage.setItem('sb-collapsed', isNowCollapsed ? '1' : '0');
+  /* ── Sidebar toggle ───────────────────── */
+  if (sbToggle) {
+    sbToggle.addEventListener('click', function () {
+      const collapsed = sidebar.classList.toggle('collapsed');
+      localStorage.setItem('sb-collapsed', collapsed ? '1' : '0');
     });
   }
 
-  // ── Toggle dark mode ──
+  /* ── Dark mode toggle ─────────────────── */
   if (themeBtn) {
     themeBtn.addEventListener('click', function () {
       const dark = document.body.classList.toggle('dark');
       if (themeIco) themeIco.className = dark ? 'ti ti-moon' : 'ti ti-sun';
+      if (themeLbl) themeLbl.textContent = dark ? 'Dark Mode' : 'Light Mode';
       localStorage.setItem('theme', dark ? 'dark' : 'light');
       if (typeof window.rerenderCharts === 'function') window.rerenderCharts();
     });
   }
+
+  /* ── Mini stats sidebar (load dari API) ── */
+  async function loadSidebarStats() {
+    try {
+      const r = await fetch('/api/sidebar-stats');
+      if (!r.ok) return;
+      const d = await r.json();
+      const gi = document.getElementById('sb-stat-gi');
+      const al = document.getElementById('sb-stat-alert');
+      if (gi) gi.textContent = d.gi_aktif ?? '—';
+      if (al) al.textContent = d.alert_count ?? '—';
+    } catch (_) {
+      /* silent fail — stats sidebar tidak kritis */
+      const gi = document.getElementById('sb-stat-gi');
+      const al = document.getElementById('sb-stat-alert');
+      if (gi) gi.textContent = '5';
+      if (al) al.textContent = '2';
+    }
+  }
+  loadSidebarStats();
+
+  /* ── Toast API (dipakai halaman lain) ─── */
+  window.showToast = function (msg, type = 'info', durationMs = 4000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const icons = { success:'check', warning:'alert-triangle', error:'x', info:'info-circle' };
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `
+      <i class="ti ti-${icons[type] || 'info-circle'}" aria-hidden="true"></i>
+      <span>${msg}</span>
+      <button class="toast-close" onclick="this.parentElement.remove()" aria-label="Tutup">
+        <i class="ti ti-x" aria-hidden="true"></i>
+      </button>`;
+    container.appendChild(toast);
+    /* animasi masuk */
+    requestAnimationFrame(() => toast.classList.add('toast-show'));
+    /* auto dismiss */
+    setTimeout(() => {
+      toast.classList.remove('toast-show');
+      toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+    }, durationMs);
+  };
+
+  /* ── Flash auto-dismiss setelah 5 detik ── */
+  document.querySelectorAll('.flash').forEach(el => {
+    setTimeout(() => {
+      el.style.opacity = '0';
+      el.addEventListener('transitionend', () => el.remove(), { once: true });
+    }, 5000);
+  });
+
 })();
 </script>
 

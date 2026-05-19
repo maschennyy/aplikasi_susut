@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Error {{ kode }} – Susut Energi{% endblock %}
+{% block content %}
+<div class="page-wrap" style="display:flex;align-items:center;justify-content:center;min-height:70vh">
+  <div style="text-align:center;max-width:420px">
+    <div style="font-size:5rem;font-weight:700;color:var(--bg2);font-family:var(--font-mono);line-height:1;margin-bottom:16px">
+      {{ kode }}
+    </div>
+    <h1 style="font-size:1.25rem;font-weight:700;color:var(--t1);margin-bottom:8px">{{ judul }}</h1>
+    <p style="font-size:.88rem;color:var(--t2);margin-bottom:24px;line-height:1.6">{{ pesan }}</p>
+    <a href="{{ url_for('dashboard') }}" class="btn-outline">
+      <i class="ti ti-arrow-left" aria-hidden="true"></i>
+      Kembali ke Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}
