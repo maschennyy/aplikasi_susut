@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Transfer EXIM - Susut Energi{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-eyebrow">Analisis</div>
+      <h1 class="page-title">Transfer EXIM</h1>
+    </div>
+    <div class="topbar-right">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span>Skema</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="metric-grid">
+    <div class="metric-card mc-blue">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Metode 1</span>
+          <div class="mc-icon"><i class="ti ti-transformer" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value">KVA</div>
+        <div class="mc-meta"><span class="mc-meta-text">proporsi trafo gardu</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-green">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Metode 2</span>
+          <div class="mc-icon"><i class="ti ti-receipt" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value">Jual</div>
+        <div class="mc-meta"><span class="mc-meta-text">tagihan pelanggan lintas UP3</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-amber">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Basis</span>
+          <div class="mc-icon"><i class="ti ti-plug" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value">Penyulang</div>
+        <div class="mc-meta"><span class="mc-meta-text">kWh total bulanan</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-danger">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Output</span>
+          <div class="mc-icon"><i class="ti ti-arrows-exchange" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value">EXIM</div>
+        <div class="mc-meta"><span class="mc-meta-text">ekspor / impor per UP3</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Proporsi KVA Gardu</div>
+      </div>
+      <div class="panel-body">
+        <div class="formula-card">
+          <span>KVA UP3 / Total KVA</span>
+          <strong>x kWh Penyulang</strong>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table compact-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Fungsi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Penyulang</td><td>Sumber kWh</td></tr>
+              <tr><td>Gardu</td><td>Titik beban</td></tr>
+              <tr><td>UP3 Gardu</td><td>Penerima energi</td></tr>
+              <tr><td>KVA Trafo</td><td>Bobot pembagi</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Tagihan kWh Jual</div>
+      </div>
+      <div class="panel-body">
+        <div class="formula-card">
+          <span>kWh Jual Pelanggan</span>
+          <strong>ditagihkan ke UP3 tujuan</strong>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table compact-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Fungsi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Penyulang Pemilik</td><td>UP3 penagih</td></tr>
+              <tr><td>Pelanggan</td><td>Objek jual</td></tr>
+              <tr><td>UP3 Pelanggan</td><td>UP3 penerima</td></tr>
+              <tr><td>kWh Jual</td><td>Nilai transfer</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div class="panel-title">Skema Data</div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table exim-schema-table">
+        <thead>
+          <tr>
+            <th>Objek</th>
+            <th>Kolom Kunci</th>
+            <th>Catatan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Rule EXIM</strong></td>
+            <td>kode_rule, metode, penyulang, up3_asal, up3_tujuan, periode</td>
+            <td>Menentukan rumus yang dipakai.</td>
+          </tr>
+          <tr>
+            <td><strong>Partisipan KVA</strong></td>
+            <td>rule, gardu, up3, kva_trafo, porsi_override</td>
+            <td>Untuk penyulang yang memasok beberapa UP3.</td>
+          </tr>
+          <tr>
+            <td><strong>Jual Pelanggan</strong></td>
+            <td>rule, pelanggan, up3_pelanggan, kwh_jual</td>
+            <td>Untuk tagihan pelanggan lintas UP3.</td>
+          </tr>
+          <tr>
+            <td><strong>Hasil Bulanan</strong></td>
+            <td>periode, rule, kwh_basis, kwh_transfer, arah</td>
+            <td>Snapshot hasil hitung yang bisa diaudit.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div class="panel-title">Alur Perhitungan</div>
+    </div>
+    <div class="exim-flow-grid">
+      <div class="exim-step"><span>1</span><strong>Upload Master</strong></div>
+      <div class="exim-step"><span>2</span><strong>Pilih Rule</strong></div>
+      <div class="exim-step"><span>3</span><strong>Hitung Bulanan</strong></div>
+      <div class="exim-step"><span>4</span><strong>Rekap EXIM</strong></div>
+    </div>
+  </section>
+</div>
+{% endblock %}

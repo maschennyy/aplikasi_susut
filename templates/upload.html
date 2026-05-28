@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Upload NKWh - Susut Energi{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-eyebrow">Data Source</div>
+      <h1 class="page-title">Upload NKWh</h1>
+    </div>
+    <div class="topbar-right">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span id="upload-live">Siap</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div class="panel-title">File Workbook</div>
+      <div class="panel-actions">
+        <button class="btn-outline" id="btn-analyze-nkwh" type="button">
+          <i class="ti ti-scan" aria-hidden="true"></i>
+          Analisa
+        </button>
+        <button class="primary-action" id="btn-import-nkwh" type="button">
+          <i class="ti ti-database-import" aria-hidden="true"></i>
+          Import
+        </button>
+      </div>
+    </div>
+    <form class="nkwh-upload-grid" id="form-nkwh-upload">
+      <label class="field nkwh-file-field">
+        <span>Workbook NKWh</span>
+        <input id="nkwh-file" name="file" type="file" accept=".xlsx,.xlsm,.xls" required>
+      </label>
+      <label class="field">
+        <span>Default Bulan</span>
+        <input id="nkwh-bulan" name="bulan" type="month">
+      </label>
+      <label class="field">
+        <span>Ambang Alert</span>
+        <input id="nkwh-threshold" name="threshold_pct" type="number" min="1" step="1" value="25">
+      </label>
+      <label class="field">
+        <span>Minimal Selisih</span>
+        <input id="nkwh-min-delta" name="min_delta" type="number" min="0" step="1000" value="10000">
+      </label>
+      <label class="toggle-field">
+        <input id="nkwh-import-exim" name="import_exim" type="checkbox" checked>
+        <span>Import EXIM</span>
+      </label>
+    </form>
+    <div class="upload-result-bar" id="nkwh-result">Belum ada file dianalisa.</div>
+  </section>
+
+  <div class="metric-grid">
+    <div class="metric-card mc-blue">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Sheet</span>
+          <div class="mc-icon"><i class="ti ti-table" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="metric-sheet-count">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">workbook terbaca</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-green">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Penyulang</span>
+          <div class="mc-icon"><i class="ti ti-plug-connected" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="metric-feeder-count">-</div>
+        <div class="mc-meta"><span class="mc-meta-text" id="metric-period">periode</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-amber">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Total kWh</span>
+          <div class="mc-icon"><i class="ti ti-bolt" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="metric-total-kwh">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">WBP + LWBP1 + LWBP2</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-danger">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">EXIM</span>
+          <div class="mc-icon"><i class="ti ti-arrows-exchange" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="metric-exim-count">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">baris rule</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col nkwh-analysis-grid">
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Struktur Workbook</div>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table compact-table" id="table-nkwh-sheets">
+          <thead>
+            <tr>
+              <th>Sheet</th>
+              <th class="tr">Baris</th>
+              <th class="tr">Kolom</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" class="empty-cell">Belum dianalisa.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Ringkasan GI</div>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table compact-table" id="table-nkwh-gi">
+          <thead>
+            <tr>
+              <th>Gardu Induk</th>
+              <th class="tr">Penyulang</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="2" class="empty-cell">Belum dianalisa.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div class="panel-title">Sample Penyulang</div>
+      <div class="pills-row" id="nkwh-method-pills"></div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table exim-schema-table" id="table-nkwh-sample">
+        <thead>
+          <tr>
+            <th>GI</th>
+            <th>Trafo</th>
+            <th>Penyulang</th>
+            <th class="tr">WBP</th>
+            <th class="tr">LWBP1</th>
+            <th class="tr">LWBP2</th>
+            <th class="tr">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="7" class="empty-cell">Belum dianalisa.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+{% endblock %}

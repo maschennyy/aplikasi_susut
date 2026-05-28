@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
   initTahunSelect();
+  setText('insight-year', currentTahun);
   bindEvents();
   loadData();
   setInterval(loadData, REFRESH_MS);
@@ -86,11 +87,15 @@ async function loadData() {
     const json = await r.json();
     allData = json.data_bulanan || [];
     setText('live-label', 'Live · ' + now());
+    setText('insight-mode', 'Live');
+    setText('insight-year', currentTahun);
     updateDashboard();
   } catch (err) {
     console.warn('API gagal, pakai demo data:', err.message);
     allData = demoData();
     setText('live-label', 'Demo');
+    setText('insight-mode', 'Demo');
+    setText('insight-year', currentTahun);
     updateDashboard();
   }
 }
@@ -316,15 +321,15 @@ function renderDetailTable(yd) {
   if (!tbody) return;
 
   tbody.innerHTML = '';
-  let nOk=0, nWn=0, nDn=0, tmu=0, tpy=0, tsk=0;
+  let nOk = 0, nWn = 0, nDn = 0, tmu = 0, tpy = 0, tsk = 0;
 
   yd.forEach(row => {
-    const p   = row.persentase_susut;
+    const p = row.persentase_susut;
     const isDn = p > TARGET, isWn = !isDn && p > TARGET * .87;
     if (isDn) nDn++; else if (isWn) nWn++; else nOk++;
     tmu += row.meter_utama; tpy += row.total_penyulang; tsk += row.susut_kwh;
 
-    const cls   = isDn ? 'row-danger' : isWn ? 'row-warn' : '';
+    const cls = isDn ? 'row-danger' : isWn ? 'row-warn' : '';
     const badge = isDn
       ? `<span class="badge badge-danger">↑ Melebihi</span>`
       : isWn

@@ -1,27 +1,230 @@
 {% extends "base.html" %}
-{% block title %}{{ judul }} – Susut Energi{% endblock %}
+{% block title %}kWh Penyulang - Susut Energi{% endblock %}
+
 {% block content %}
 <div class="page-wrap">
   <div class="topbar">
     <div class="topbar-left">
-      <div class="page-eyebrow">{{ eyebrow }}</div>
-      <h1 class="page-title">{{ judul }}</h1>
+      <div class="page-eyebrow">Monitoring Feeder</div>
+      <h1 class="page-title">kWh Penyulang</h1>
+    </div>
+    <div class="topbar-right">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span id="penyulang-live">Memuat</span>
+      </div>
+      <button id="btn-refresh-penyulang" class="btn-outline">
+        <i class="ti ti-refresh" aria-hidden="true"></i>
+        Refresh
+      </button>
+      <button id="btn-export-penyulang" class="btn-outline">
+        <i class="ti ti-download" aria-hidden="true"></i>
+        Export CSV
+      </button>
     </div>
   </div>
 
-  <div class="coming-soon-wrap">
-    <div class="cs-icon">
-      <i class="ti ti-{{ icon }}" aria-hidden="true"></i>
+  <section class="filter-panel" aria-label="Filter penyulang">
+    <label class="field">
+      <span>Gardu Induk</span>
+      <select id="filter-gi"></select>
+    </label>
+    <label class="field">
+      <span>Area / UP3</span>
+      <select id="filter-area"></select>
+    </label>
+    <label class="field">
+      <span>Trafo</span>
+      <select id="filter-trafo"></select>
+    </label>
+    <label class="field">
+      <span>Penyulang</span>
+      <select id="filter-penyulang"></select>
+    </label>
+    <label class="field">
+      <span>Grouping</span>
+      <select id="filter-group">
+        <option value="area">Area / UP3</option>
+        <option value="gi">Gardu Induk</option>
+        <option value="trafo">Trafo GI</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Tahun</span>
+      <select id="filter-tahun"></select>
+    </label>
+    <label class="field">
+      <span>Bulan Fokus</span>
+      <select id="filter-bulan"></select>
+    </label>
+    <button id="btn-terapkan" class="primary-action">
+      <i class="ti ti-adjustments" aria-hidden="true"></i>
+      Terapkan
+    </button>
+  </section>
+
+  <section class="panel panel-full upload-inline-panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Upload Data Penyulang</div>
+        <div class="panel-sub">CSV/XLSX manual: bisa berisi master penyulang, area/UP3, status, bulan, WBP/LWBP, atau stand awal/akhir</div>
+      </div>
+      <a href="#" id="btn-sample-penyulang" class="btn-outline">
+        <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
+        Contoh Format
+      </a>
     </div>
-    <h2 class="cs-title">Halaman Sedang Dikembangkan</h2>
-    <p class="cs-desc">
-      {{ desc }}<br>
-      Halaman ini akan tersedia pada sesi pengembangan berikutnya.
-    </p>
-    <a href="{{ url_for('dashboard') }}" class="btn-outline" style="margin-top:16px;display:inline-flex">
-      <i class="ti ti-arrow-left" aria-hidden="true"></i>
-      Kembali ke Dashboard
-    </a>
+    <form id="form-upload-penyulang" class="upload-grid">
+      <label class="field">
+        <span>File CSV/XLSX</span>
+        <input id="upload-file-penyulang" name="file" type="file" accept=".csv,.xlsx,.xls" required>
+      </label>
+      <label class="field">
+        <span>Default Bulan</span>
+        <input id="upload-bulan-penyulang" name="bulan" type="month">
+      </label>
+      <label class="field">
+        <span>Ambang Alert</span>
+        <input id="upload-threshold-penyulang" name="threshold_pct" type="number" min="1" step="1" value="25">
+      </label>
+      <label class="field">
+        <span>Minimal Selisih kWh</span>
+        <input id="upload-min-delta-penyulang" name="min_delta" type="number" min="0" step="1000" value="10000">
+      </label>
+      <button class="primary-action" type="submit">
+        <i class="ti ti-upload" aria-hidden="true"></i>
+        Upload
+      </button>
+    </form>
+    <div class="upload-note" id="upload-result-penyulang">
+      Kolom yang dikenali: bulan, kode_gi, kode_trafo, kode_penyulang, nama_penyulang, area_up3, status, stand_awal, stand_akhir, faktor_kali, wbp, lwbp1, lwbp2, total_kwh.
+    </div>
+  </section>
+
+  <div class="metric-grid feeder-metrics">
+    <div class="metric-card mc-blue">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Total kWh Tahun</span>
+          <div class="mc-icon"><i class="ti ti-bolt" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="metric-total-year">-</div>
+        <div class="mc-meta"><span class="mc-meta-text" id="metric-scope">Semua GI</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-green">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Bulan Fokus</span>
+          <div class="mc-icon"><i class="ti ti-calendar-stats" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="metric-month-total">-</div>
+        <div class="mc-meta"><span class="mc-meta-text" id="metric-month-label">-</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-amber">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Penyulang Aktif</span>
+          <div class="mc-icon"><i class="ti ti-plug-connected" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="metric-feeder-count">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">punya pembacaan tahun ini</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-danger">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Alert Bulan Fokus</span>
+          <div class="mc-icon"><i class="ti ti-alert-triangle" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="metric-alert-count">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">flag deviasi meter</span></div>
+      </div>
+    </div>
   </div>
+
+  <div class="two-col feeder-charts">
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Tren kWh Penyulang</div>
+          <div class="panel-sub" id="trend-caption">Akumulasi bulanan sesuai filter aktif</div>
+        </div>
+      </div>
+      <div class="chart-box" style="height:260px">
+        <canvas id="chart-feeder-trend" role="img" aria-label="Tren kWh penyulang bulanan"></canvas>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Komposisi Energi</div>
+          <div class="panel-sub">WBP, LWBP1, dan LWBP2 pada bulan fokus</div>
+        </div>
+      </div>
+      <div class="chart-box" style="height:260px">
+        <canvas id="chart-feeder-mix" role="img" aria-label="Komposisi energi feeder"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Rekap Penyulang</div>
+        <div class="panel-sub" id="table-caption">Memuat data penyulang</div>
+      </div>
+      <div class="pills-row" id="summary-pills"></div>
+    </div>
+    <div class="table-scroll feeder-table-wrap">
+      <table class="data-table feeder-table" id="table-penyulang">
+        <thead>
+          <tr>
+            <th>Penyulang</th>
+            <th>Jenis</th>
+            <th>Area / UP3</th>
+            <th>Status</th>
+            <th class="tr">Jan</th>
+            <th class="tr">Feb</th>
+            <th class="tr">Mar</th>
+            <th class="tr">Apr</th>
+            <th class="tr">Mei</th>
+            <th class="tr">Jun</th>
+            <th class="tr">Jul</th>
+            <th class="tr">Ags</th>
+            <th class="tr">Sep</th>
+            <th class="tr">Okt</th>
+            <th class="tr">Nov</th>
+            <th class="tr">Des</th>
+            <th class="tr">Total</th>
+            <th class="tr">Perubahan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="18" class="empty-cell">Memuat data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Alert Bulan Fokus</div>
+        <div class="panel-sub">Penyulang dengan flag pembacaan yang perlu ditinjau</div>
+      </div>
+    </div>
+    <div class="alert-list" id="alert-list"></div>
+  </section>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/penyulang.js') }}"></script>
 {% endblock %}

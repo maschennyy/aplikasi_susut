@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Analisis Deviasi - Susut Energi{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-eyebrow">Analisis MU vs Penyulang</div>
+      <h1 class="page-title">Analisis Deviasi</h1>
+    </div>
+    <div class="topbar-right">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span id="deviasi-live">Memuat</span>
+      </div>
+      <button id="btn-refresh-deviasi" class="btn-outline">
+        <i class="ti ti-refresh" aria-hidden="true"></i>
+        Refresh
+      </button>
+      <button id="btn-export-deviasi" class="btn-outline">
+        <i class="ti ti-download" aria-hidden="true"></i>
+        Export CSV
+      </button>
+    </div>
+  </div>
+
+  <section class="filter-panel" aria-label="Filter deviasi">
+    <label class="field">
+      <span>Gardu Induk</span>
+      <select id="filter-deviasi-gi"></select>
+    </label>
+    <label class="field">
+      <span>Tahun</span>
+      <select id="filter-deviasi-tahun"></select>
+    </label>
+    <label class="field">
+      <span>Bulan Fokus</span>
+      <select id="filter-deviasi-bulan"></select>
+    </label>
+    <button id="btn-terapkan-deviasi" class="primary-action">
+      <i class="ti ti-adjustments" aria-hidden="true"></i>
+      Terapkan
+    </button>
+  </section>
+
+  <div class="metric-grid deviasi-metrics">
+    <div class="metric-card mc-blue">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">MU Fokus</span>
+          <div class="mc-icon"><i class="ti ti-bolt" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="deviasi-focus-mu">-</div>
+        <div class="mc-meta"><span class="mc-meta-text" id="deviasi-scope">-</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-green">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Penyulang Fokus</span>
+          <div class="mc-icon"><i class="ti ti-plug" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="deviasi-focus-feeder">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">total kWh penyulang</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-amber">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Selisih Fokus</span>
+          <div class="mc-icon"><i class="ti ti-arrows-diff" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="deviasi-focus-gap">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">MU dikurangi penyulang</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-danger">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Deviasi GI</span>
+          <div class="mc-icon"><i class="ti ti-percentage" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="deviasi-focus-pct">-</div>
+        <div class="mc-meta"><span class="mc-meta-text" id="deviasi-focus-label">-</span></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="trafo-grid" id="deviasi-trafo-grid" aria-label="Deviasi per trafo"></section>
+
+  <div class="two-col">
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Tren Deviasi GI</div>
+          <div class="panel-sub">Persentase deviasi MU terhadap total penyulang</div>
+        </div>
+      </div>
+      <div class="chart-box" style="height:270px">
+        <canvas id="chart-deviasi-trend" role="img" aria-label="Tren deviasi gardu induk"></canvas>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Deviasi per Trafo</div>
+          <div class="panel-sub">Bulan fokus, jumlah trafo mengikuti konfigurasi GI</div>
+        </div>
+      </div>
+      <div class="chart-box" style="height:270px">
+        <canvas id="chart-deviasi-trafo" role="img" aria-label="Deviasi per trafo"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Rekap Deviasi Trafo</div>
+        <div class="panel-sub" id="deviasi-table-caption">Memuat data deviasi</div>
+      </div>
+      <div class="pills-row" id="deviasi-summary-pills"></div>
+    </div>
+    <div class="table-scroll meter-table-wrap">
+      <table class="data-table meter-table" id="table-deviasi">
+        <thead>
+          <tr>
+            <th>Trafo</th>
+            <th class="tr">MU Fokus</th>
+            <th class="tr">Penyulang Fokus</th>
+            <th class="tr">Selisih</th>
+            <th class="tr">Deviasi</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="6" class="empty-cell">Memuat data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/deviasi.js') }}"></script>
+{% endblock %}

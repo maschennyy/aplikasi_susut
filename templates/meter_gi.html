@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Main Meter GI - Susut Energi{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-eyebrow">Monitoring Gardu Induk</div>
+      <h1 class="page-title">Main Meter GI</h1>
+    </div>
+    <div class="topbar-right">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span id="meter-live">Memuat</span>
+      </div>
+      <button id="btn-refresh-meter" class="btn-outline">
+        <i class="ti ti-refresh" aria-hidden="true"></i>
+        Refresh
+      </button>
+      <button id="btn-export-meter" class="btn-outline">
+        <i class="ti ti-download" aria-hidden="true"></i>
+        Export CSV
+      </button>
+    </div>
+  </div>
+
+  <section class="filter-panel" aria-label="Filter main meter">
+    <label class="field">
+      <span>Gardu Induk</span>
+      <select id="filter-meter-gi"></select>
+    </label>
+    <label class="field">
+      <span>Tahun</span>
+      <select id="filter-meter-tahun"></select>
+    </label>
+    <label class="field">
+      <span>Bulan Fokus</span>
+      <select id="filter-meter-bulan"></select>
+    </label>
+    <button id="btn-terapkan-meter" class="primary-action">
+      <i class="ti ti-adjustments" aria-hidden="true"></i>
+      Terapkan
+    </button>
+  </section>
+
+  <div class="metric-grid meter-metrics">
+    <div class="metric-card mc-blue">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Total MU Tahun</span>
+          <div class="mc-icon"><i class="ti ti-bolt" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="meter-total-mu">-</div>
+        <div class="mc-meta"><span class="mc-meta-text" id="meter-scope">-</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-green">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Total MP Tahun</span>
+          <div class="mc-icon"><i class="ti ti-gauge" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="meter-total-mp">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">meter pembanding</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-amber">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Jumlah Trafo</span>
+          <div class="mc-icon"><i class="ti ti-transformer" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="meter-trafo-count">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">mengikuti konfigurasi GI</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-danger">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Deviasi Fokus</span>
+          <div class="mc-icon"><i class="ti ti-delta" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="meter-focus-deviasi">-</div>
+        <div class="mc-meta"><span class="mc-meta-text" id="meter-focus-label">-</span></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="trafo-grid" id="trafo-grid" aria-label="Ringkasan trafo"></section>
+
+  <div class="two-col meter-charts">
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Tren MU vs MP</div>
+          <div class="panel-sub">Akumulasi seluruh trafo pada GI terpilih</div>
+        </div>
+      </div>
+      <div class="chart-box" style="height:270px">
+        <canvas id="chart-meter-trend" role="img" aria-label="Tren meter utama dan meter pembanding"></canvas>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Pemakaian per Trafo</div>
+          <div class="panel-sub">MU pada bulan fokus, adaptif 2 sampai 5 trafo</div>
+        </div>
+      </div>
+      <div class="chart-box" style="height:270px">
+        <canvas id="chart-trafo-focus" role="img" aria-label="Pemakaian per trafo bulan fokus"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Rekap Pemakaian Trafo</div>
+        <div class="panel-sub" id="meter-table-caption">Memuat data meter</div>
+      </div>
+      <div class="pills-row" id="meter-summary-pills"></div>
+    </div>
+    <div class="table-scroll meter-table-wrap">
+      <table class="data-table meter-table" id="table-meter">
+        <thead>
+          <tr>
+            <th>Trafo</th>
+            <th>Kapasitas</th>
+            <th class="tr">Jan</th>
+            <th class="tr">Feb</th>
+            <th class="tr">Mar</th>
+            <th class="tr">Apr</th>
+            <th class="tr">Mei</th>
+            <th class="tr">Jun</th>
+            <th class="tr">Jul</th>
+            <th class="tr">Ags</th>
+            <th class="tr">Sep</th>
+            <th class="tr">Okt</th>
+            <th class="tr">Nov</th>
+            <th class="tr">Des</th>
+            <th class="tr">Total MU</th>
+            <th class="tr">Deviasi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="16" class="empty-cell">Memuat data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/meter_gi.js') }}"></script>
+{% endblock %}

@@ -108,14 +108,18 @@ class Penyulang(db.Model):
     nama_penyulang  = db.Column(db.String(100), nullable=False)  # 'Batuceper'
     jenis           = db.Column(db.String(20),  default='REGULAR')
                       # REGULAR | INTERKONEKSI
+    area_up3        = db.Column(db.String(100))                 # Pemilik area / UP3
+    ex_cabang       = db.Column(db.String(50))                  # Kode eks cabang / unit asal data
+    status          = db.Column(db.String(30), default='AKTIF') # AKTIF | NONAKTIF | CADANGAN
     aktif           = db.Column(db.Boolean, default=True)
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at      = db.Column(db.DateTime, default=datetime.utcnow,
                                 onupdate=datetime.utcnow)
 
     # Relasi
+    gardu_induk     = db.relationship('GarduInduk', backref='penyulangs')
     feeder_readings = db.relationship('FeederReading', backref='penyulang',
-                                      lazy=True, cascade='all, delete-orphan')
+                                    lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
         return {
@@ -125,6 +129,10 @@ class Penyulang(db.Model):
             'kode_penyulang': self.kode_penyulang,
             'nama_penyulang': self.nama_penyulang,
             'jenis':          self.jenis,
+            'area_up3':       self.area_up3,
+            'ex_cabang':      self.ex_cabang,
+            'status':         self.status or ('AKTIF' if self.aktif else 'NONAKTIF'),
+            'aktif':          self.aktif,
         }
 
     def __repr__(self):
@@ -246,8 +254,30 @@ class FeederReading(db.Model):
     kwh_lwbp1       = db.Column(db.Numeric(15, 2))
     kwh_lwbp2       = db.Column(db.Numeric(15, 2))
 
+    # Detail NKWh: workbook memisahkan stand per register H/L1/L2.
+    wbp_stand_awal    = db.Column(db.Numeric(15, 2))
+    wbp_stand_akhir   = db.Column(db.Numeric(15, 2))
+    wbp_faktor_kali   = db.Column(db.Numeric(10, 2))
+    lwbp1_stand_awal  = db.Column(db.Numeric(15, 2))
+    lwbp1_stand_akhir = db.Column(db.Numeric(15, 2))
+    lwbp1_faktor_kali = db.Column(db.Numeric(10, 2))
+    lwbp2_stand_awal  = db.Column(db.Numeric(15, 2))
+    lwbp2_stand_akhir = db.Column(db.Numeric(15, 2))
+    lwbp2_faktor_kali = db.Column(db.Numeric(10, 2))
+
+    manual_kwh_wbp    = db.Column(db.Numeric(15, 2))
+    manual_kwh_lwbp1  = db.Column(db.Numeric(15, 2))
+    manual_kwh_lwbp2  = db.Column(db.Numeric(15, 2))
+
+    source_format     = db.Column(db.String(30))
+    source_sheet      = db.Column(db.String(80))
+    source_row_start  = db.Column(db.Integer)
+    source_row_end    = db.Column(db.Integer)
+
     # Flag otomatis jika deviasi melebihi threshold
     flag_alert      = db.Column(db.Boolean, default=False)
+    deviasi_persen  = db.Column(db.Numeric(8, 2))
+    anomaly_type    = db.Column(db.String(30))
     catatan         = db.Column(db.Text)
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at      = db.Column(db.DateTime, default=datetime.utcnow,
@@ -275,6 +305,30 @@ class FeederReading(db.Model):
             )
         return None
 
+    @property
+    def manual_kwh_total(self):
+        """Total kWh manual dari split NKWh jika tersedia."""
+        total = (
+            (self.manual_kwh_wbp   or 0) +
+            (self.manual_kwh_lwbp1 or 0) +
+            (self.manual_kwh_lwbp2 or 0)
+        )
+        return float(total) if total else 0.0
+
+    @property
+    def register_kwh_hitung(self):
+        """Total hitung dari stand WBP, LWBP1, dan LWBP2."""
+        total = 0
+        has_value = False
+        for prefix in ('wbp', 'lwbp1', 'lwbp2'):
+            awal = getattr(self, f'{prefix}_stand_awal')
+            akhir = getattr(self, f'{prefix}_stand_akhir')
+            faktor = getattr(self, f'{prefix}_faktor_kali') or 1
+            if awal is not None and akhir is not None:
+                total += (akhir - awal) * faktor
+                has_value = True
+        return float(total) if has_value else None
+
     def to_dict(self):
         return {
             'id':             self.id,
@@ -290,7 +344,19 @@ class FeederReading(db.Model):
             'kwh_lwbp2':      float(self.kwh_lwbp2    or 0),
             'kwh_total':      self.kwh_total,
             'kwh_hitung':     self.kwh_hitung,
+            'register_kwh_hitung': self.register_kwh_hitung,
+            'manual_kwh_wbp':     float(self.manual_kwh_wbp   or 0),
+            'manual_kwh_lwbp1':   float(self.manual_kwh_lwbp1 or 0),
+            'manual_kwh_lwbp2':   float(self.manual_kwh_lwbp2 or 0),
+            'manual_kwh_total':   self.manual_kwh_total,
+            'source_format':      self.source_format,
+            'source_sheet':       self.source_sheet,
+            'source_row_start':   self.source_row_start,
+            'source_row_end':     self.source_row_end,
             'flag_alert':     self.flag_alert,
+            'deviasi_persen':  float(self.deviasi_persen or 0),
+            'anomaly_type':    self.anomaly_type,
+            'catatan':         self.catatan,
         }
 
     def __repr__(self):
@@ -336,6 +402,182 @@ class TransferAntarUnit(db.Model):
 # ─────────────────────────────────────────────────────
 # 7. REKAP BULANAN (cache kalkulasi per GI per bulan)
 # ─────────────────────────────────────────────────────
+class EximRule(db.Model):
+    __tablename__ = 'exim_rule'
+    __table_args__ = (
+        db.UniqueConstraint('kode_rule', name='uq_exim_rule_kode'),
+    )
+
+    id              = db.Column(db.Integer, primary_key=True)
+    kode_rule       = db.Column(db.String(60), nullable=False)
+    nama_rule       = db.Column(db.String(150))
+    metode          = db.Column(db.String(30), nullable=False)
+    penyulang_id    = db.Column(db.Integer, db.ForeignKey('penyulang.id'),
+                                nullable=True)
+    gi_id           = db.Column(db.Integer, db.ForeignKey('gardu_induk.id'),
+                                nullable=True)
+    up3_asal        = db.Column(db.String(100))
+    up3_tujuan      = db.Column(db.String(100))
+    fungsi          = db.Column(db.String(20))  # KIRIM | TERIMA
+    arah            = db.Column(db.String(10))  # EKSPOR | IMPOR
+    periode_mulai   = db.Column(db.Date)
+    periode_selesai = db.Column(db.Date)
+    aktif           = db.Column(db.Boolean, default=True)
+    source_sheet    = db.Column(db.String(80))
+    source_row      = db.Column(db.Integer)
+    catatan         = db.Column(db.Text)
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at      = db.Column(db.DateTime, default=datetime.utcnow,
+                                onupdate=datetime.utcnow)
+
+    penyulang       = db.relationship('Penyulang', backref='exim_rules')
+    gardu_induk     = db.relationship('GarduInduk', backref='exim_rules')
+    kva_participants = db.relationship('EximKvaParticipant', backref='rule',
+                                       lazy=True, cascade='all, delete-orphan')
+    customer_charges = db.relationship('EximCustomerCharge', backref='rule',
+                                       lazy=True, cascade='all, delete-orphan')
+    monthly_results = db.relationship('EximMonthlyResult', backref='rule',
+                                      lazy=True, cascade='all, delete-orphan')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'kode_rule': self.kode_rule,
+            'nama_rule': self.nama_rule,
+            'metode': self.metode,
+            'penyulang_id': self.penyulang_id,
+            'gi_id': self.gi_id,
+            'up3_asal': self.up3_asal,
+            'up3_tujuan': self.up3_tujuan,
+            'fungsi': self.fungsi,
+            'arah': self.arah,
+            'aktif': self.aktif,
+            'source_sheet': self.source_sheet,
+            'source_row': self.source_row,
+            'catatan': self.catatan,
+        }
+
+    def __repr__(self):
+        return f'<EximRule {self.kode_rule} - {self.metode}>'
+
+
+class EximKvaParticipant(db.Model):
+    __tablename__ = 'exim_kva_participant'
+
+    id              = db.Column(db.Integer, primary_key=True)
+    rule_id         = db.Column(db.Integer, db.ForeignKey('exim_rule.id',
+                                 ondelete='CASCADE'), nullable=False)
+    nama_gardu      = db.Column(db.String(150), nullable=False)
+    up3             = db.Column(db.String(100), nullable=False)
+    fungsi          = db.Column(db.String(20))
+    kva_trafo       = db.Column(db.Numeric(12, 2), default=0)
+    porsi_override  = db.Column(db.Numeric(10, 6))
+    catatan         = db.Column(db.Text)
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def porsi_override_float(self):
+        if self.porsi_override is None:
+            return None
+        return float(self.porsi_override)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'rule_id': self.rule_id,
+            'nama_gardu': self.nama_gardu,
+            'up3': self.up3,
+            'fungsi': self.fungsi,
+            'kva_trafo': float(self.kva_trafo or 0),
+            'porsi_override': self.porsi_override_float,
+            'catatan': self.catatan,
+        }
+
+
+class EximCustomerCharge(db.Model):
+    __tablename__ = 'exim_customer_charge'
+
+    id              = db.Column(db.Integer, primary_key=True)
+    rule_id         = db.Column(db.Integer, db.ForeignKey('exim_rule.id',
+                                 ondelete='CASCADE'), nullable=False)
+    periode_bulan   = db.Column(db.Date, nullable=False)
+    id_pelanggan    = db.Column(db.String(60))
+    nama_pelanggan  = db.Column(db.String(150))
+    up3_pelanggan   = db.Column(db.String(100))
+    kwh_jual        = db.Column(db.Numeric(15, 2), default=0)
+    catatan         = db.Column(db.Text)
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'rule_id': self.rule_id,
+            'periode_bulan': self.periode_bulan.strftime('%Y-%m-%d'),
+            'id_pelanggan': self.id_pelanggan,
+            'nama_pelanggan': self.nama_pelanggan,
+            'up3_pelanggan': self.up3_pelanggan,
+            'kwh_jual': float(self.kwh_jual or 0),
+            'catatan': self.catatan,
+        }
+
+
+class EximMonthlyResult(db.Model):
+    __tablename__ = 'exim_monthly_result'
+    __table_args__ = (
+        db.UniqueConstraint('rule_id', 'periode_bulan', 'up3_tujuan',
+                            name='uq_exim_result_rule_bulan_tujuan'),
+    )
+
+    id              = db.Column(db.Integer, primary_key=True)
+    rule_id         = db.Column(db.Integer, db.ForeignKey('exim_rule.id',
+                                 ondelete='CASCADE'), nullable=False)
+    periode_bulan   = db.Column(db.Date, nullable=False)
+    metode          = db.Column(db.String(30), nullable=False)
+    penyulang_id    = db.Column(db.Integer, db.ForeignKey('penyulang.id'),
+                                nullable=True)
+    gi_id           = db.Column(db.Integer, db.ForeignKey('gardu_induk.id'),
+                                nullable=True)
+    up3_asal        = db.Column(db.String(100))
+    up3_tujuan      = db.Column(db.String(100))
+    fungsi          = db.Column(db.String(20))
+    arah            = db.Column(db.String(10))
+    kwh_basis       = db.Column(db.Numeric(15, 2), default=0)
+    kwh_wbp         = db.Column(db.Numeric(15, 2), default=0)
+    kwh_lwbp1       = db.Column(db.Numeric(15, 2), default=0)
+    kwh_lwbp2       = db.Column(db.Numeric(15, 2), default=0)
+    kwh_transfer    = db.Column(db.Numeric(15, 2), default=0)
+    porsi           = db.Column(db.Numeric(10, 6))
+    source_sheet    = db.Column(db.String(80))
+    source_row      = db.Column(db.Integer)
+    versi_hitung    = db.Column(db.String(30), default='nkwh-v1')
+    catatan         = db.Column(db.Text)
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'rule_id': self.rule_id,
+            'periode_bulan': self.periode_bulan.strftime('%Y-%m-%d'),
+            'metode': self.metode,
+            'penyulang_id': self.penyulang_id,
+            'gi_id': self.gi_id,
+            'up3_asal': self.up3_asal,
+            'up3_tujuan': self.up3_tujuan,
+            'fungsi': self.fungsi,
+            'arah': self.arah,
+            'kwh_basis': float(self.kwh_basis or 0),
+            'kwh_wbp': float(self.kwh_wbp or 0),
+            'kwh_lwbp1': float(self.kwh_lwbp1 or 0),
+            'kwh_lwbp2': float(self.kwh_lwbp2 or 0),
+            'kwh_transfer': float(self.kwh_transfer or 0),
+            'porsi': float(self.porsi) if self.porsi is not None else None,
+            'source_sheet': self.source_sheet,
+            'source_row': self.source_row,
+            'versi_hitung': self.versi_hitung,
+            'catatan': self.catatan,
+        }
+
+
 class RekapBulanan(db.Model):
     __tablename__ = 'rekap_bulanan'
     __table_args__ = (

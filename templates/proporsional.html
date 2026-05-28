@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}Detail Proporsional - Susut Energi{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-eyebrow">Alokasi Deviasi Antar Unit</div>
+      <h1 class="page-title">Detail Proporsional</h1>
+    </div>
+    <div class="topbar-right">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span id="prop-live">Memuat</span>
+      </div>
+      <button id="btn-refresh-prop" class="btn-outline">
+        <i class="ti ti-refresh" aria-hidden="true"></i>
+        Refresh
+      </button>
+      <button id="btn-export-prop" class="btn-outline">
+        <i class="ti ti-download" aria-hidden="true"></i>
+        Export CSV
+      </button>
+    </div>
+  </div>
+
+  <section class="filter-panel" aria-label="Filter proporsional">
+    <label class="field">
+      <span>Gardu Induk</span>
+      <select id="filter-prop-gi"></select>
+    </label>
+    <label class="field">
+      <span>Tahun</span>
+      <select id="filter-prop-tahun"></select>
+    </label>
+    <label class="field">
+      <span>Bulan</span>
+      <select id="filter-prop-bulan"></select>
+    </label>
+    <button id="btn-terapkan-prop" class="primary-action">
+      <i class="ti ti-calculator" aria-hidden="true"></i>
+      Hitung
+    </button>
+  </section>
+
+  <section class="prop-flow" aria-label="Alur perhitungan proporsional">
+    <article class="prop-flow-item">
+      <span>01</span>
+      <strong>Meter Utama</strong>
+      <p>Acuan transaksi energi per GI dan per trafo.</p>
+    </article>
+    <article class="prop-flow-item">
+      <span>02</span>
+      <strong>Hasil Baca Penyulang</strong>
+      <p>Total pemakaian penyulang menjadi dasar porsi pembagian.</p>
+    </article>
+    <article class="prop-flow-item">
+      <span>03</span>
+      <strong>Deviasi Proporsional</strong>
+      <p>Selisih dibagi kembali sesuai kontribusi kWh tiap penyulang.</p>
+    </article>
+  </section>
+
+  <div class="metric-grid prop-metrics">
+    <div class="metric-card mc-blue">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Meter Utama</span>
+          <div class="mc-icon"><i class="ti ti-bolt" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="prop-mu-total">-</div>
+        <div class="mc-meta"><span class="mc-meta-text" id="prop-scope">-</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-green">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Hasil Baca</span>
+          <div class="mc-icon"><i class="ti ti-plug" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="prop-feeder-total">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">total kWh penyulang</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-amber">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Deviasi Dibagi</span>
+          <div class="mc-icon"><i class="ti ti-arrows-split" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="prop-deviasi-total">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">MU dikurangi hasil baca</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-danger">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Deviasi</span>
+          <div class="mc-icon"><i class="ti ti-percentage" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="prop-deviasi-pct">-</div>
+        <div class="mc-meta"><span class="mc-meta-text" id="prop-period">-</span></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="trafo-grid" id="prop-group-grid" aria-label="Ringkasan kelompok proporsional"></section>
+
+  <div class="two-col">
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Distribusi Per Kelompok</div>
+          <div class="panel-sub">Hasil baca dibanding nilai setelah alokasi proporsional</div>
+        </div>
+      </div>
+      <div class="chart-box" style="height:280px">
+        <canvas id="chart-prop-group" role="img" aria-label="Grafik proporsional per kelompok"></canvas>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Komposisi Deviasi</div>
+          <div class="panel-sub">Porsi deviasi yang dialokasikan ke tiap kelompok</div>
+        </div>
+      </div>
+      <div class="chart-box" style="height:280px">
+        <canvas id="chart-prop-share" role="img" aria-label="Komposisi deviasi proporsional"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Rekap Per Trafo</div>
+        <div class="panel-sub" id="prop-trafo-caption">Memuat data trafo</div>
+      </div>
+      <div class="pills-row" id="prop-summary-pills"></div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table prop-trafo-table" id="table-prop-trafo">
+        <thead>
+          <tr>
+            <th>Trafo</th>
+            <th class="tr">Meter Utama</th>
+            <th class="tr">Hasil Baca</th>
+            <th class="tr">Deviasi</th>
+            <th class="tr">Proporsional</th>
+            <th class="tr">Porsi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="6" class="empty-cell">Memuat data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Detail Perhitungan kWh Penyulang</div>
+        <div class="panel-sub" id="prop-table-caption">Memuat data proporsional</div>
+      </div>
+      <div class="chart-legend">
+        <span class="cl-item"><span class="cl-dot" style="background:var(--green)"></span>Hasil baca</span>
+        <span class="cl-item"><span class="cl-dot" style="background:var(--blue)"></span>Proporsional</span>
+      </div>
+    </div>
+    <div class="table-scroll prop-table-wrap">
+      <table class="data-table prop-table" id="table-prop">
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>Penyulang</th>
+            <th>Ex. Cabang</th>
+            <th>Area / UP3</th>
+            <th class="tr">Faktor</th>
+            <th class="tr">WBP</th>
+            <th class="tr">LWBP1</th>
+            <th class="tr">LWBP2</th>
+            <th class="tr">Total Baca</th>
+            <th class="tr">WBP Prop.</th>
+            <th class="tr">LWBP1 Prop.</th>
+            <th class="tr">LWBP2 Prop.</th>
+            <th class="tr">Total Prop.</th>
+            <th class="tr">Deviasi</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="15" class="empty-cell">Memuat data...</td></tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="5">Total</td>
+            <td class="tr mono" id="prop-ft-wbp">-</td>
+            <td class="tr mono" id="prop-ft-lwbp1">-</td>
+            <td class="tr mono" id="prop-ft-lwbp2">-</td>
+            <td class="tr mono" id="prop-ft-baca">-</td>
+            <td class="tr mono" id="prop-ft-pwbp">-</td>
+            <td class="tr mono" id="prop-ft-plwbp1">-</td>
+            <td class="tr mono" id="prop-ft-plwbp2">-</td>
+            <td class="tr mono" id="prop-ft-prop">-</td>
+            <td class="tr mono" id="prop-ft-dev">-</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/proporsional.js') }}"></script>
+{% endblock %}
