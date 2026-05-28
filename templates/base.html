@@ -22,9 +22,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   {% block head %}{% endblock %}
 </head>
 <body>
+{% set active_user = current_user() %}
 
 <div class="app-layout">
   <aside class="sidebar" id="sidebar">
@@ -43,41 +45,51 @@
       </div>
 
       <div class="sb-user">
-        <div class="sb-avatar">AD</div>
+        <div class="sb-avatar">{{ active_user.initials if active_user else 'US' }}</div>
         <div class="sb-user-info">
-          <span class="sb-user-name">Admin PLN</span>
-          <span class="sb-user-role">Supervisor UP3</span>
+          <span class="sb-user-name">{{ active_user.display_name if active_user else 'User' }}</span>
+          <span class="sb-user-role">{{ active_user.role|title if active_user else 'Viewer' }}</span>
         </div>
       </div>
 
       <nav class="sb-nav" aria-label="Menu navigasi">
-        <span class="sb-nav-section">Monitoring</span>
-
         <a href="{{ url_for('dashboard') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'dashboard' }}" data-tip="Dashboard">
           <i class="ti ti-layout-dashboard" aria-hidden="true"></i>
           <span class="sb-nav-label">Dashboard</span>
         </a>
+
+        <span class="sb-nav-section">Gardu Induk</span>
 
         <a href="{{ url_for('halaman_penyulang') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_penyulang' }}" data-tip="kWh Penyulang">
           <i class="ti ti-plug" aria-hidden="true"></i>
           <span class="sb-nav-label">kWh Penyulang</span>
         </a>
 
-        <a href="{{ url_for('halaman_meter_gi') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_meter_gi' }}" data-tip="Main Meter GI">
-          <i class="ti ti-gauge" aria-hidden="true"></i>
-          <span class="sb-nav-label">Main Meter GI</span>
+        <a href="{{ url_for('halaman_kwh_utama') }}" class="sb-nav-item {{ 'active' if request.endpoint in ['halaman_kwh_utama', 'halaman_meter_gi'] }}" data-tip="kWh Utama">
+          <i class="ti ti-bolt" aria-hidden="true"></i>
+          <span class="sb-nav-label">kWh Utama</span>
         </a>
 
-        <span class="sb-nav-section">Analisis</span>
+        <a href="{{ url_for('halaman_kwh_pembanding') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_kwh_pembanding' }}" data-tip="kWh Pembanding">
+          <i class="ti ti-gauge" aria-hidden="true"></i>
+          <span class="sb-nav-label">kWh Pembanding</span>
+        </a>
+
+        <a href="{{ url_for('halaman_psgi') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_psgi' }}" data-tip="PSGI">
+          <i class="ti ti-building-factory-2" aria-hidden="true"></i>
+          <span class="sb-nav-label">PSGI</span>
+        </a>
 
         <a href="{{ url_for('halaman_deviasi') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_deviasi' }}" data-tip="Analisis Deviasi">
           <i class="ti ti-chart-bar" aria-hidden="true"></i>
-          <span class="sb-nav-label">Analisis Deviasi</span>
+          <span class="sb-nav-label">Deviasi</span>
         </a>
 
-        <a href="{{ url_for('halaman_proporsional') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_proporsional' }}" data-tip="Detail Proporsional">
-          <i class="ti ti-percentage" aria-hidden="true"></i>
-          <span class="sb-nav-label">Detail Proporsional</span>
+        <span class="sb-nav-section">UID</span>
+
+        <a href="{{ url_for('halaman_transfer_antar_uid') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_transfer_antar_uid' }}" data-tip="Transfer Antar UID">
+          <i class="ti ti-arrows-transfer-up" aria-hidden="true"></i>
+          <span class="sb-nav-label">Transfer Antar UID</span>
         </a>
 
         <a href="{{ url_for('halaman_transfer') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_transfer' }}" data-tip="Transfer EXIM">
@@ -85,16 +97,19 @@
           <span class="sb-nav-label">Transfer EXIM</span>
         </a>
 
-        <span class="sb-nav-section">Laporan</span>
-
-        <a href="{{ url_for('halaman_rekap') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_rekap' }}" data-tip="Rekapitulasi">
-          <i class="ti ti-report" aria-hidden="true"></i>
-          <span class="sb-nav-label">Rekapitulasi</span>
+        <a href="{{ url_for('halaman_proporsional') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_proporsional' }}" data-tip="Proporsional">
+          <i class="ti ti-percentage" aria-hidden="true"></i>
+          <span class="sb-nav-label">Proporsional</span>
         </a>
 
-        <a href="{{ url_for('halaman_upload') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_upload' }}" data-tip="Upload NKWh">
-          <i class="ti ti-upload" aria-hidden="true"></i>
-          <span class="sb-nav-label">Upload NKWh</span>
+        <a href="{{ url_for('halaman_rekap') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_rekap' }}" data-tip="Rekap kWh">
+          <i class="ti ti-report-analytics" aria-hidden="true"></i>
+          <span class="sb-nav-label">Rekap kWh</span>
+        </a>
+
+        <a href="{{ url_for('halaman_profile') }}" class="sb-nav-item {{ 'active' if request.endpoint in ['halaman_profile', 'halaman_upload', 'halaman_security'] }}" data-tip="Profile">
+          <i class="ti ti-user-circle" aria-hidden="true"></i>
+          <span class="sb-nav-label">Profile</span>
         </a>
       </nav>
     </div>
@@ -114,6 +129,13 @@
         <i class="ti ti-sun" id="theme-icon" aria-hidden="true"></i>
         <span class="sb-nav-label" id="theme-label">Light Mode</span>
       </button>
+      <form action="{{ url_for('logout') }}" method="post" class="sb-logout-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="sb-theme-btn" type="submit" aria-label="Logout">
+          <i class="ti ti-logout" aria-hidden="true"></i>
+          <span class="sb-nav-label">Logout</span>
+        </button>
+      </form>
     </div>
   </aside>
 
@@ -145,6 +167,19 @@
 (function AppCore() {
   'use strict';
 
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = function secureFetch(input, init = {}) {
+    const opts = { ...init };
+    const method = String(opts.method || 'GET').toUpperCase();
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && csrfToken) {
+      const headers = new Headers(opts.headers || {});
+      headers.set('X-CSRFToken', csrfToken);
+      opts.headers = headers;
+    }
+    return nativeFetch(input, opts);
+  };
+
   const sidebar = document.getElementById('sidebar');
   const toggle = document.getElementById('sb-toggle');
   const themeBtn = document.getElementById('theme-toggle');
@@ -157,6 +192,7 @@
 
   function syncSidebar() {
     if (!sidebar || !toggle) return;
+    // Di mobile (<821px), sidebar selalu expanded — collapse hanya berlaku desktop
     const collapsed = desktop.matches && getStore('sb-collapsed') === '1';
     sidebar.classList.toggle('collapsed', collapsed);
     document.documentElement.classList.toggle('sidebar-collapsed', collapsed);
@@ -164,6 +200,8 @@
     toggle.setAttribute('aria-expanded', String(!collapsed));
     toggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
     toggle.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+    // Pastikan tombol selalu bisa diklik — pointer-events tidak terblokir
+    toggle.style.pointerEvents = 'auto';
   }
 
   function applyTheme(dark) {
@@ -176,9 +214,13 @@
   }
 
   if (toggle) {
-    toggle.addEventListener('click', function () {
-      const next = !sidebar.classList.contains('collapsed');
-      setStore('sb-collapsed', next ? '1' : '0');
+    toggle.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      // Baca state SEKARANG lalu toggle
+      const isCurrentlyCollapsed = sidebar.classList.contains('collapsed');
+      const willCollapse = !isCurrentlyCollapsed;
+      setStore('sb-collapsed', willCollapse ? '1' : '0');
       syncSidebar();
     });
   }

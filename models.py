@@ -10,8 +10,98 @@ Struktur relasi:
 
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from werkzeug.security import check_password_hash, generate_password_hash
 
 db = SQLAlchemy()
+
+
+class User(db.Model):
+    __tablename__ = 'app_user'
+    __table_args__ = (
+        db.UniqueConstraint('username', name='uq_user_username'),
+    )
+
+    id            = db.Column(db.Integer, primary_key=True)
+    username      = db.Column(db.String(80), nullable=False)
+    nama_lengkap  = db.Column(db.String(120))
+    email         = db.Column(db.String(120))
+    role          = db.Column(db.String(30), default='viewer', nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    aktif         = db.Column(db.Boolean, default=True)
+    last_login_at = db.Column(db.DateTime)
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at    = db.Column(db.DateTime, default=datetime.utcnow,
+                              onupdate=datetime.utcnow)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    @property
+    def display_name(self):
+        return self.nama_lengkap or self.username
+
+    @property
+    def initials(self):
+        words = [word for word in self.display_name.split() if word]
+        if not words:
+            return 'US'
+        if len(words) == 1:
+            return words[0][:2].upper()
+        return (words[0][0] + words[-1][0]).upper()
+
+    def has_role(self, *roles):
+        return self.role in roles
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'nama_lengkap': self.nama_lengkap,
+            'email': self.email,
+            'role': self.role,
+            'aktif': self.aktif,
+            'last_login_at': self.last_login_at.isoformat() if self.last_login_at else None,
+        }
+
+    def __repr__(self):
+        return f'<User {self.username} - {self.role}>'
+
+
+class AuditLog(db.Model):
+    __tablename__ = 'audit_log'
+
+    id          = db.Column(db.Integer, primary_key=True)
+    user_id     = db.Column(db.Integer, db.ForeignKey('app_user.id'), nullable=True)
+    username    = db.Column(db.String(80))
+    role        = db.Column(db.String(30))
+    action      = db.Column(db.String(80), nullable=False)
+    entity_type = db.Column(db.String(80))
+    entity_id   = db.Column(db.String(80))
+    status      = db.Column(db.String(20), default='SUCCESS')
+    ip_address  = db.Column(db.String(64))
+    user_agent  = db.Column(db.String(255))
+    detail_json = db.Column(db.Text)
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user        = db.relationship('User', backref='audit_logs')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'username': self.username,
+            'role': self.role,
+            'action': self.action,
+            'entity_type': self.entity_type,
+            'entity_id': self.entity_id,
+            'status': self.status,
+            'ip_address': self.ip_address,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'detail_json': self.detail_json,
+        }
 
 
 # ─────────────────────────────────────────────────────

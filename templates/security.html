@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Security - Susut Energi{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-eyebrow">Admin</div>
+      <h1 class="page-title">Security</h1>
+    </div>
+    <div class="topbar-right">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span id="security-live">Memuat</span>
+      </div>
+      <button id="btn-refresh-security" class="btn-outline">
+        <i class="ti ti-refresh" aria-hidden="true"></i>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="metric-grid security-metrics">
+    <div class="metric-card mc-blue">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">User</span>
+          <div class="mc-icon"><i class="ti ti-users" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="sec-users-total">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">akun terdaftar</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-green">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Aktif</span>
+          <div class="mc-icon"><i class="ti ti-user-check" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="sec-users-active">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">bisa login</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-danger">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Gagal Login</span>
+          <div class="mc-icon"><i class="ti ti-lock-exclamation" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="sec-failed-login">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">tercatat audit</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-amber">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Import</span>
+          <div class="mc-icon"><i class="ti ti-database-import" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="sec-imports">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">aksi data</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col security-grid">
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Tambah User</div>
+      </div>
+      <form class="security-form" id="form-create-user">
+        <label class="field">
+          <span>Username</span>
+          <input name="username" autocomplete="off" required>
+        </label>
+        <label class="field">
+          <span>Nama</span>
+          <input name="nama_lengkap" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>Email</span>
+          <input name="email" type="email" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>Role</span>
+          <select name="role">
+            <option value="viewer">Viewer</option>
+            <option value="operator">Operator</option>
+            <option value="auditor">Auditor</option>
+            <option value="admin">Admin</option>
+          </select>
+        </label>
+        <label class="field security-span">
+          <span>Password Awal</span>
+          <input name="password" type="password" autocomplete="new-password" required>
+        </label>
+        <button class="primary-action security-submit" type="submit">
+          <i class="ti ti-user-plus" aria-hidden="true"></i>
+          Tambah
+        </button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Reset Password</div>
+      </div>
+      <form class="security-form" id="form-reset-password">
+        <label class="field security-span">
+          <span>User</span>
+          <select id="reset-user-id" name="user_id"></select>
+        </label>
+        <label class="field security-span">
+          <span>Password Baru</span>
+          <input name="password" type="password" autocomplete="new-password" required>
+        </label>
+        <button class="primary-action security-submit" type="submit">
+          <i class="ti ti-key" aria-hidden="true"></i>
+          Reset
+        </button>
+      </form>
+    </section>
+  </div>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div class="panel-title">User Access</div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table security-table" id="table-users">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Login Terakhir</th>
+            <th class="tr">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="5" class="empty-cell">Memuat user...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div class="panel-title">Audit Log</div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table audit-table" id="table-audit">
+        <thead>
+          <tr>
+            <th>Waktu</th>
+            <th>User</th>
+            <th>Action</th>
+            <th>Status</th>
+            <th>IP</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="6" class="empty-cell">Memuat audit...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/security.js') }}"></script>
+{% endblock %}

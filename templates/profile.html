@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Profile - Susut Energi{% endblock %}
+
+{% block content %}
+{% set user = current_user() %}
+<div class="page-wrap">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-eyebrow">Akun</div>
+      <h1 class="page-title">Profile</h1>
+    </div>
+  </div>
+
+  <div class="metric-grid">
+    <div class="metric-card mc-blue">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">User</span>
+          <div class="mc-icon"><i class="ti ti-user-circle" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value">{{ user.initials if user else '-' }}</div>
+        <div class="mc-meta"><span class="mc-meta-text">{{ user.display_name if user else '-' }}</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-green">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Role</span>
+          <div class="mc-icon"><i class="ti ti-id-badge-2" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value">{{ user.role|title if user else '-' }}</div>
+        <div class="mc-meta"><span class="mc-meta-text">akses aplikasi</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-amber">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Status</span>
+          <div class="mc-icon"><i class="ti ti-shield-check" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value">{{ 'Aktif' if user and user.aktif else 'Nonaktif' }}</div>
+        <div class="mc-meta"><span class="mc-meta-text">session aman</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col security-grid">
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Informasi Akun</div>
+      </div>
+      <div class="panel-body">
+        <div class="table-scroll">
+          <table class="data-table compact-table">
+            <tbody>
+              <tr><td>Username</td><td><strong>{{ user.username if user else '-' }}</strong></td></tr>
+              <tr><td>Nama</td><td>{{ user.display_name if user else '-' }}</td></tr>
+              <tr><td>Email</td><td>{{ user.email if user and user.email else '-' }}</td></tr>
+              <tr><td>Login Terakhir</td><td>{{ user.last_login_at.strftime('%d %b %Y %H:%M') if user and user.last_login_at else '-' }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Ganti Password</div>
+      </div>
+      <form class="security-form" id="form-profile-password">
+        <label class="field security-span">
+          <span>Password Saat Ini</span>
+          <input name="current_password" type="password" autocomplete="current-password" required>
+        </label>
+        <label class="field security-span">
+          <span>Password Baru</span>
+          <input name="new_password" type="password" autocomplete="new-password" required>
+        </label>
+        <button class="primary-action security-submit" type="submit">
+          <i class="ti ti-key" aria-hidden="true"></i>
+          Simpan
+        </button>
+      </form>
+    </section>
+  </div>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div class="panel-title">Akses Cepat</div>
+    </div>
+    <div class="exim-flow-grid">
+      {% if user and user.role in ['admin', 'operator'] %}
+        <a class="exim-step" href="{{ url_for('halaman_upload') }}"><span><i class="ti ti-upload" aria-hidden="true"></i></span><strong>Upload NKWh</strong></a>
+      {% endif %}
+      {% if user and user.role == 'admin' %}
+        <a class="exim-step" href="{{ url_for('halaman_security') }}"><span><i class="ti ti-shield-lock" aria-hidden="true"></i></span><strong>Security</strong></a>
+      {% endif %}
+      <a class="exim-step" href="{{ url_for('halaman_rekap') }}"><span><i class="ti ti-report-analytics" aria-hidden="true"></i></span><strong>Rekap kWh</strong></a>
+      <a class="exim-step" href="{{ url_for('dashboard') }}"><span><i class="ti ti-layout-dashboard" aria-hidden="true"></i></span><strong>Dashboard</strong></a>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/profile.js') }}"></script>
+{% endblock %}

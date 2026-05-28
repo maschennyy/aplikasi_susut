@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Main Meter GI - Susut Energi{% endblock %}
+{% block title %}{{ judul|default('kWh Utama') }} - Susut Energi{% endblock %}
 
 {% block content %}
 <div class="page-wrap">
   <div class="topbar">
     <div class="topbar-left">
-      <div class="page-eyebrow">Monitoring Gardu Induk</div>
-      <h1 class="page-title">Main Meter GI</h1>
+      <div class="page-eyebrow">{{ eyebrow|default('Gardu Induk') }}</div>
+      <h1 class="page-title">{{ judul|default('kWh Utama') }}</h1>
     </div>
     <div class="topbar-right">
       <div class="live-badge">
@@ -24,7 +24,7 @@
     </div>
   </div>
 
-  <section class="filter-panel" aria-label="Filter main meter">
+  <section class="filter-panel" aria-label="Filter {{ judul|default('kWh Utama')|lower }}">
     <label class="field">
       <span>Gardu Induk</span>
       <select id="filter-meter-gi"></select>
@@ -48,8 +48,8 @@
       <div class="mc-stripe"></div>
       <div class="mc-body">
         <div class="mc-head">
-          <span class="mc-label">Total MU Tahun</span>
-          <div class="mc-icon"><i class="ti ti-bolt" aria-hidden="true"></i></div>
+          <span class="mc-label">{{ primary_total_label|default('Total MU Tahun') }}</span>
+          <div class="mc-icon"><i class="ti ti-{{ primary_icon|default('bolt') }}" aria-hidden="true"></i></div>
         </div>
         <div class="mc-value" id="meter-total-mu">-</div>
         <div class="mc-meta"><span class="mc-meta-text" id="meter-scope">-</span></div>
@@ -59,11 +59,11 @@
       <div class="mc-stripe"></div>
       <div class="mc-body">
         <div class="mc-head">
-          <span class="mc-label">Total MP Tahun</span>
-          <div class="mc-icon"><i class="ti ti-gauge" aria-hidden="true"></i></div>
+          <span class="mc-label">{{ secondary_total_label|default('Total MP Tahun') }}</span>
+          <div class="mc-icon"><i class="ti ti-{{ secondary_icon|default('gauge') }}" aria-hidden="true"></i></div>
         </div>
         <div class="mc-value" id="meter-total-mp">-</div>
-        <div class="mc-meta"><span class="mc-meta-text">meter pembanding</span></div>
+        <div class="mc-meta"><span class="mc-meta-text">{{ secondary_meta|default('meter pembanding') }}</span></div>
       </div>
     </div>
     <div class="metric-card mc-amber">
@@ -96,7 +96,7 @@
     <section class="panel">
       <div class="panel-header">
         <div>
-          <div class="panel-title">Tren MU vs MP</div>
+          <div class="panel-title">{{ chart_title|default('Tren MU vs MP') }}</div>
           <div class="panel-sub">Akumulasi seluruh trafo pada GI terpilih</div>
         </div>
       </div>
@@ -108,8 +108,8 @@
     <section class="panel">
       <div class="panel-header">
         <div>
-          <div class="panel-title">Pemakaian per Trafo</div>
-          <div class="panel-sub">MU pada bulan fokus, adaptif 2 sampai 5 trafo</div>
+          <div class="panel-title">{{ focus_chart_title|default('Pemakaian per Trafo') }}</div>
+          <div class="panel-sub">{{ primary_short|default('MU') }} pada bulan fokus, adaptif 2 sampai 5 trafo</div>
         </div>
       </div>
       <div class="chart-box" style="height:270px">
@@ -121,7 +121,7 @@
   <section class="panel panel-full">
     <div class="panel-header">
       <div>
-        <div class="panel-title">Rekap Pemakaian Trafo</div>
+        <div class="panel-title">{{ table_title|default('Rekap Pemakaian Trafo') }}</div>
         <div class="panel-sub" id="meter-table-caption">Memuat data meter</div>
       </div>
       <div class="pills-row" id="meter-summary-pills"></div>
@@ -144,7 +144,7 @@
             <th class="tr">Okt</th>
             <th class="tr">Nov</th>
             <th class="tr">Des</th>
-            <th class="tr">Total MU</th>
+            <th class="tr">Total {{ primary_short|default('MU') }}</th>
             <th class="tr">Deviasi</th>
           </tr>
         </thead>
@@ -158,5 +158,15 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+window.METER_PAGE = {{ {
+  'mode': meter_mode|default('utama'),
+  'primaryLabel': primary_name|default('Meter Utama'),
+  'secondaryLabel': secondary_name|default('Meter Pembanding'),
+  'primaryShort': primary_short|default('MU'),
+  'secondaryShort': secondary_short|default('MP'),
+  'exportName': export_name|default('kwh_utama')
+}|tojson }};
+</script>
 <script src="{{ url_for('static', filename='js/meter_gi.js') }}"></script>
 {% endblock %}

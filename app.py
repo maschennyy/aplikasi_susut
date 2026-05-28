@@ -3,23 +3,32 @@ app.py v5 — Aplikasi Susut Energi
 Semua route yang direferensikan di base.html sudah ada.
 """
 
-from flask import Flask, render_template, jsonify, request, flash, redirect, url_for
+from flask import (Flask, abort, g, jsonify, redirect, render_template,
+                   request, session, url_for)
 from config import Config
 from models import (db, GarduInduk, Trafo, Penyulang,
                     MeterReading, FeederReading,
                     TransferAntarUnit, RekapBulanan,
-                    EximRule, EximMonthlyResult)
+                    EximRule, EximMonthlyResult,
+                    User, AuditLog)
 from nkwh_excel import analyze_workbook, parse_nkwh_feeders, parse_exim_rows
 from sqlalchemy import func, text, inspect
 from sqlalchemy import and_
-from datetime import date
+from collections import defaultdict, deque
+from datetime import date, datetime, timedelta
 from decimal import Decimal
+from functools import wraps
+from werkzeug.utils import secure_filename
+import click
+import json
 import pandas as pd
+import secrets
 import os
 
 app = Flask(__name__)
 app.config.from_object(Config)
 Config.validate()
+app.permanent_session_lifetime = timedelta(hours=app.config.get('PERMANENT_SESSION_HOURS', 8))
 db.init_app(app)
 
 with app.app_context():
@@ -61,12 +70,391 @@ with app.app_context():
         for column_name, ddl in columns:
             if column_name not in existing:
                 db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {column_name} {ddl}'))
+    if User.query.count() == 0:
+        admin_username = os.getenv('ADMIN_USERNAME')
+        admin_password = os.getenv('ADMIN_PASSWORD')
+        if admin_username and admin_password:
+            admin = User(
+                username=admin_username.strip(),
+                nama_lengkap=os.getenv('ADMIN_NAME', 'Administrator'),
+                email=os.getenv('ADMIN_EMAIL'),
+                role='admin',
+                aktif=True,
+            )
+            admin.set_password(admin_password)
+            db.session.add(admin)
     db.session.commit()
 
 
 # ════════════════════════════════════════════════
 # HALAMAN — semua route yang ada di sidebar
 # ════════════════════════════════════════════════
+
+SAFE_METHODS = {'GET', 'HEAD', 'OPTIONS'}
+PUBLIC_ENDPOINTS = {'login', 'static'}
+WRITE_ROLES = {'admin', 'operator'}
+ALLOWED_GENERIC_UPLOADS = {'csv', 'xlsx', 'xlsm', 'xls'}
+ALLOWED_NKWH_UPLOADS = {'xlsx', 'xlsm'}
+XLS_SIGNATURE = bytes.fromhex('d0cf11e0a1b11ae1')
+LOGIN_FAILURES = defaultdict(deque)
+LOGIN_LOCKOUTS = {}
+UPLOAD_EVENTS = defaultdict(deque)
+ROLES = {'admin', 'operator', 'viewer', 'auditor'}
+
+
+def _json_error(message, status=400):
+    return jsonify({'error': message}), status
+
+
+def _wants_json():
+    return request.path.startswith('/api/') or request.accept_mimetypes.best == 'application/json'
+
+
+def _client_ip():
+    forwarded = request.headers.get('X-Forwarded-For')
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    return request.remote_addr or 'unknown'
+
+
+def _current_user():
+    user_id = session.get('user_id')
+    if not user_id:
+        return None
+    return db.session.get(User, user_id)
+
+
+def _ensure_csrf_token():
+    token = session.get('csrf_token')
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session['csrf_token'] = token
+    return token
+
+
+def csrf_token():
+    return _ensure_csrf_token()
+
+
+def _validate_csrf():
+    expected = session.get('csrf_token')
+    supplied = (
+        request.headers.get('X-CSRFToken') or
+        request.headers.get('X-CSRF-Token') or
+        request.form.get('csrf_token')
+    )
+    return bool(expected and supplied and secrets.compare_digest(expected, supplied))
+
+
+def _login_user(user):
+    session.clear()
+    session.permanent = True
+    session['user_id'] = user.id
+    session['username'] = user.username
+    session['role'] = user.role
+    _ensure_csrf_token()
+    user.last_login_at = datetime.utcnow()
+
+
+def _logout_user():
+    session.clear()
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not getattr(g, 'current_user', None):
+            if _wants_json():
+                return _json_error('Login diperlukan.', 401)
+            return redirect(url_for('login', next=request.full_path if request.query_string else request.path))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def role_required(*roles):
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            user = getattr(g, 'current_user', None)
+            if not user:
+                if _wants_json():
+                    return _json_error('Login diperlukan.', 401)
+                return redirect(url_for('login', next=request.path))
+            if user.role not in roles:
+                if _wants_json():
+                    return _json_error('Akses ditolak untuk role ini.', 403)
+                abort(403)
+            return view(*args, **kwargs)
+        return wrapped
+    return decorator
+
+
+def _prune_events(events, window_minutes):
+    cutoff = datetime.utcnow() - timedelta(minutes=window_minutes)
+    while events and events[0] < cutoff:
+        events.popleft()
+
+
+def _rate_limited(bucket, key, limit, window_minutes):
+    events = bucket[key]
+    _prune_events(events, window_minutes)
+    return len(events) >= limit
+
+
+def _record_rate_event(bucket, key, window_minutes):
+    events = bucket[key]
+    _prune_events(events, window_minutes)
+    events.append(datetime.utcnow())
+
+
+def _clear_rate_events(bucket, key):
+    bucket.pop(key, None)
+
+
+def _is_login_locked(key):
+    until = LOGIN_LOCKOUTS.get(key)
+    if not until:
+        return False
+    if until <= datetime.utcnow():
+        LOGIN_LOCKOUTS.pop(key, None)
+        return False
+    return True
+
+
+def _lock_login(key):
+    LOGIN_LOCKOUTS[key] = datetime.utcnow() + timedelta(minutes=app.config.get('LOGIN_LOCKOUT_MINUTES', 15))
+
+
+def _login_rate_key(username):
+    return f'{_client_ip()}:{(username or "").lower()}'
+
+
+def _upload_rate_key():
+    user = getattr(g, 'current_user', None)
+    return f'{user.id if user else "anon"}:{_client_ip()}'
+
+
+def _validate_password_policy(password):
+    min_len = app.config.get('PASSWORD_MIN_LENGTH', 10)
+    if len(password or '') < min_len:
+        return f'Password minimal {min_len} karakter.'
+    checks = [
+        any(ch.islower() for ch in password),
+        any(ch.isupper() for ch in password),
+        any(ch.isdigit() for ch in password),
+        any(not ch.isalnum() for ch in password),
+    ]
+    if sum(checks) < 3:
+        return 'Password harus memakai minimal 3 jenis karakter: huruf kecil, huruf besar, angka, atau simbol.'
+    return None
+
+
+def _request_payload():
+    if request.is_json:
+        return request.get_json(silent=True) or {}
+    return request.form.to_dict()
+
+
+def _bool_value(value):
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on', 'aktif'}
+
+
+def _check_upload_rate():
+    key = _upload_rate_key()
+    if _rate_limited(
+        UPLOAD_EVENTS,
+        key,
+        app.config.get('UPLOAD_RATE_LIMIT', 10),
+        app.config.get('UPLOAD_RATE_WINDOW_MINUTES', 10),
+    ):
+        raise ValueError('Terlalu banyak upload dalam waktu singkat. Coba lagi beberapa menit lagi.')
+    _record_rate_event(UPLOAD_EVENTS, key, app.config.get('UPLOAD_RATE_WINDOW_MINUTES', 10))
+
+
+def _audit(action, entity_type=None, entity_id=None, detail=None, status='SUCCESS', username=None):
+    user = getattr(g, 'current_user', None)
+    record = AuditLog(
+        user_id=user.id if user else None,
+        username=username or (user.username if user else None),
+        role=user.role if user else None,
+        action=action,
+        entity_type=entity_type,
+        entity_id=str(entity_id) if entity_id is not None else None,
+        status=status,
+        ip_address=_client_ip(),
+        user_agent=(request.headers.get('User-Agent') or '')[:255],
+        detail_json=json.dumps(detail or {}, ensure_ascii=False),
+    )
+    db.session.add(record)
+
+
+def _safe_commit_audit(action, detail=None, status='SUCCESS', username=None):
+    try:
+        _audit(action, detail=detail, status=status, username=username)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+def _extension(filename):
+    return secure_filename(filename or '').rsplit('.', 1)[-1].lower() if '.' in (filename or '') else ''
+
+
+def _validate_upload_file(file, allowed_extensions):
+    filename = secure_filename(file.filename or '')
+    ext = _extension(filename)
+    if not filename:
+        raise ValueError('Nama file kosong.')
+    if ext not in allowed_extensions:
+        allowed = ', '.join(sorted(allowed_extensions))
+        raise ValueError(f'Format file tidak diizinkan. Gunakan: {allowed}.')
+    if request.content_length and request.content_length > app.config['MAX_CONTENT_LENGTH']:
+        max_mb = app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
+        raise ValueError(f'Ukuran file melebihi batas {max_mb} MB.')
+
+    pos = file.stream.tell()
+    head = file.stream.read(8)
+    file.stream.seek(pos)
+    if ext in {'xlsx', 'xlsm'} and not head.startswith(b'PK'):
+        raise ValueError('File Excel tidak valid atau rusak.')
+    if ext == 'xls' and head != XLS_SIGNATURE:
+        raise ValueError('File XLS tidak valid atau rusak.')
+    return filename, ext
+
+
+@app.context_processor
+def inject_security_context():
+    return {
+        'csrf_token': csrf_token,
+        'current_user': lambda: getattr(g, 'current_user', None),
+    }
+
+
+@app.before_request
+def apply_security_gate():
+    g.current_user = _current_user()
+    if g.current_user and not g.current_user.aktif:
+        _logout_user()
+        g.current_user = None
+
+    if request.endpoint in PUBLIC_ENDPOINTS:
+        return None
+
+    if request.method not in SAFE_METHODS and not _validate_csrf():
+        if _wants_json():
+            return _json_error('CSRF token tidak valid.', 403)
+        abort(403)
+
+    if app.config.get('SECURITY_REQUIRE_LOGIN', True) and not g.current_user:
+        if _wants_json():
+            return _json_error('Login diperlukan.', 401)
+        return redirect(url_for('login', next=request.full_path if request.query_string else request.path))
+    return None
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+    response.headers.setdefault('Referrer-Policy', 'same-origin')
+    response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+    response.headers.setdefault(
+        'Content-Security-Policy',
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+        "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; "
+        "img-src 'self' data:; connect-src 'self'; frame-ancestors 'self';"
+    )
+    return response
+
+
+@app.cli.command('create-admin')
+@click.option('--username', prompt=True)
+@click.option('--password', prompt=True, hide_input=True, confirmation_prompt=True)
+@click.option('--name', default='Administrator')
+def create_admin_command(username, password, name):
+    password_error = _validate_password_policy(password)
+    if password_error:
+        raise click.ClickException(password_error)
+    existing = User.query.filter_by(username=username.strip()).first()
+    if existing:
+        existing.role = 'admin'
+        existing.aktif = True
+        existing.nama_lengkap = name or existing.nama_lengkap
+        existing.set_password(password)
+        action = 'diperbarui'
+    else:
+        user = User(username=username.strip(), nama_lengkap=name, role='admin', aktif=True)
+        user.set_password(password)
+        db.session.add(user)
+        action = 'dibuat'
+    db.session.commit()
+    click.echo(f'Admin {username} berhasil {action}.')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        if not _validate_csrf():
+            abort(403)
+        username = (request.form.get('username') or '').strip()
+        password = request.form.get('password') or ''
+        rate_key = _login_rate_key(username)
+        if _is_login_locked(rate_key):
+            _safe_commit_audit('LOGIN_RATE_LIMITED', detail={'username': username}, status='FAILED', username=username)
+            return render_template('login.html',
+                                   error='Terlalu banyak percobaan login gagal. Coba lagi beberapa menit lagi.',
+                                   next_url=request.form.get('next', '')), 429
+        if _rate_limited(
+            LOGIN_FAILURES,
+            rate_key,
+            app.config.get('LOGIN_RATE_LIMIT', 5),
+            app.config.get('LOGIN_RATE_WINDOW_MINUTES', 15),
+        ):
+            _safe_commit_audit('LOGIN_RATE_LIMITED', detail={'username': username}, status='FAILED', username=username)
+            return render_template('login.html',
+                                   error='Terlalu banyak percobaan login gagal. Coba lagi beberapa menit lagi.',
+                                   next_url=request.form.get('next', '')), 429
+        user = User.query.filter_by(username=username).first()
+        if user and user.aktif and user.check_password(password):
+            _login_user(user)
+            g.current_user = user
+            _clear_rate_events(LOGIN_FAILURES, rate_key)
+            _audit('LOGIN', entity_type='user', entity_id=user.id, detail={'username': user.username})
+            db.session.commit()
+            next_url = request.form.get('next') or url_for('dashboard')
+            if not next_url.startswith('/'):
+                next_url = url_for('dashboard')
+            return redirect(next_url)
+
+        _record_rate_event(LOGIN_FAILURES, rate_key, app.config.get('LOGIN_RATE_WINDOW_MINUTES', 15))
+        if _rate_limited(
+            LOGIN_FAILURES,
+            rate_key,
+            app.config.get('LOGIN_RATE_LIMIT', 5),
+            app.config.get('LOGIN_RATE_WINDOW_MINUTES', 15),
+        ):
+            _lock_login(rate_key)
+        _safe_commit_audit('LOGIN_FAILED', detail={'username': username}, status='FAILED', username=username)
+        return render_template('login.html', error='Username atau password tidak sesuai.', next_url=request.form.get('next', ''))
+
+    if getattr(g, 'current_user', None):
+        return redirect(url_for('dashboard'))
+    return render_template('login.html', next_url=request.args.get('next', ''))
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    if not _validate_csrf():
+        abort(403)
+    username = session.get('username')
+    _safe_commit_audit('LOGOUT', detail={'username': username}, username=username)
+    _logout_user()
+    return redirect(url_for('login'))
+
 
 @app.route('/')
 def dashboard():
@@ -75,44 +463,107 @@ def dashboard():
 @app.route('/penyulang')
 def halaman_penyulang():
     return render_template('penyulang.html',
-        eyebrow='Monitoring', judul='kWh Penyulang',
+        eyebrow='Gardu Induk', judul='kWh Penyulang',
         icon='plug', desc='Data pembacaan meter per penyulang.')
+
+
+def _render_meter_page(mode='utama'):
+    is_pembanding = mode == 'pembanding'
+    return render_template('meter_gi.html',
+        eyebrow='Gardu Induk',
+        judul='kWh Pembanding' if is_pembanding else 'kWh Utama',
+        icon='gauge' if is_pembanding else 'bolt',
+        desc='Data kWh meter pembanding per trafo gardu induk.' if is_pembanding else 'Data kWh meter utama per trafo gardu induk.',
+        meter_mode='pembanding' if is_pembanding else 'utama',
+        primary_total_label='Total MP Tahun' if is_pembanding else 'Total MU Tahun',
+        secondary_total_label='Total MU Tahun' if is_pembanding else 'Total MP Tahun',
+        primary_meta='meter pembanding' if is_pembanding else 'meter utama',
+        secondary_meta='meter utama' if is_pembanding else 'meter pembanding',
+        primary_icon='gauge' if is_pembanding else 'bolt',
+        secondary_icon='bolt' if is_pembanding else 'gauge',
+        primary_name='Meter Pembanding' if is_pembanding else 'Meter Utama',
+        secondary_name='Meter Utama' if is_pembanding else 'Meter Pembanding',
+        primary_short='MP' if is_pembanding else 'MU',
+        secondary_short='MU' if is_pembanding else 'MP',
+        chart_title='Tren MP vs MU' if is_pembanding else 'Tren MU vs MP',
+        focus_chart_title='Pemakaian MP per Trafo' if is_pembanding else 'Pemakaian MU per Trafo',
+        table_title='Rekap kWh Pembanding per Trafo' if is_pembanding else 'Rekap kWh Utama per Trafo',
+        export_name='kwh_pembanding' if is_pembanding else 'kwh_utama')
+
+
+@app.route('/kwh-utama')
+def halaman_kwh_utama():
+    return _render_meter_page('utama')
+
+
+@app.route('/kwh-pembanding')
+def halaman_kwh_pembanding():
+    return _render_meter_page('pembanding')
+
 
 @app.route('/meter-gi')
 def halaman_meter_gi():
-    return render_template('meter_gi.html',
-        eyebrow='Monitoring', judul='Main Meter GI',
-        icon='gauge', desc='Data Meter Utama dan Meter Pembanding per Gardu Induk.')
+    return _render_meter_page('utama')
+
+
+@app.route('/psgi')
+def halaman_psgi():
+    return render_template('rekap.html',
+        eyebrow='Gardu Induk', judul='PSGI',
+        icon='building-factory-2',
+        desc='Pemakaian sendiri gardu induk per periode dan relasinya terhadap perhitungan susut.')
 
 @app.route('/deviasi')
 def halaman_deviasi():
     return render_template('deviasi.html',
-        eyebrow='Analisis', judul='Analisis Deviasi',
+        eyebrow='Gardu Induk', judul='Deviasi',
         icon='chart-bar', desc='Perbandingan MU vs MP vs total penyulang.')
 
 @app.route('/proporsional')
 def halaman_proporsional():
     return render_template('proporsional.html',
-        eyebrow='Analisis', judul='Detail Proporsional',
+        eyebrow='UID', judul='Proporsional',
         icon='percentage', desc='Alokasi energi proporsional per penyulang.')
+
+@app.route('/transfer-antar-uid')
+def halaman_transfer_antar_uid():
+    return render_template('transfer_uid.html',
+        eyebrow='UID', judul='Transfer Antar UID',
+        icon='arrows-transfer-up', desc='Rekap ekspor dan impor energi antar UID.')
 
 @app.route('/transfer')
 def halaman_transfer():
     return render_template('transfer.html',
-        eyebrow='Analisis', judul='Transfer EXIM',
+        eyebrow='UID', judul='Transfer EXIM',
         icon='arrows-exchange', desc='Monitoring ekspor dan impor energi antar unit.')
 
 @app.route('/rekap')
 def halaman_rekap():
     return render_template('rekap.html',
-        eyebrow='Laporan', judul='Rekapitulasi Bulanan',
+        eyebrow='Rekap kWh', judul='Rekap kWh',
         icon='report', desc='Rekap kWh dan susut per GI per bulan.')
 
+
+@app.route('/profile')
+def halaman_profile():
+    return render_template('profile.html',
+        eyebrow='Akun', judul='Profile',
+        icon='user-circle', desc='Informasi akun dan preferensi akses aplikasi.')
+
 @app.route('/upload')
+@role_required('admin', 'operator')
 def halaman_upload():
     return render_template('upload.html',
         eyebrow='Laporan', judul='Upload NKWh',
         icon='upload', desc='Upload file NKWh Excel/CSV untuk import data penyulang.')
+
+
+@app.route('/security')
+@role_required('admin')
+def halaman_security():
+    return render_template('security.html',
+        eyebrow='Admin', judul='Security',
+        icon='shield-lock', desc='Manajemen user dan audit log aplikasi.')
 
 
 # ════════════════════════════════════════════════
@@ -399,7 +850,149 @@ def api_rekap():
 # API — UPLOAD (placeholder, lengkap di Sesi 2)
 # ════════════════════════════════════════════════
 
+@app.route('/api/audit-log')
+@role_required('admin')
+def api_audit_log():
+    try:
+        limit = request.args.get('limit', default=100, type=int)
+        limit = min(max(limit, 1), 500)
+        rows = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(limit).all()
+        return jsonify([row.to_dict() for row in rows])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/security-summary')
+@role_required('admin')
+def api_security_summary():
+    try:
+        users_total = User.query.count()
+        active_users = User.query.filter_by(aktif=True).count()
+        failed_logins = AuditLog.query.filter_by(action='LOGIN_FAILED').count()
+        imports = AuditLog.query.filter(
+            AuditLog.action.in_(['IMPORT_NKWH', 'IMPORT_PENYULANG'])
+        ).count()
+        return jsonify({
+            'users_total': users_total,
+            'active_users': active_users,
+            'failed_logins': failed_logins,
+            'imports': imports,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/users')
+@role_required('admin')
+def api_users_list():
+    try:
+        rows = User.query.order_by(User.username).all()
+        return jsonify([row.to_dict() for row in rows])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/users', methods=['POST'])
+@role_required('admin')
+def api_users_create():
+    payload = _request_payload()
+    username = (payload.get('username') or '').strip()
+    password = payload.get('password') or ''
+    role = (payload.get('role') or 'viewer').strip().lower()
+    if not username:
+        return jsonify({'error': 'Username wajib diisi.'}), 400
+    if role not in ROLES:
+        return jsonify({'error': 'Role tidak valid.'}), 400
+    password_error = _validate_password_policy(password)
+    if password_error:
+        return jsonify({'error': password_error}), 400
+    if User.query.filter_by(username=username).first():
+        return jsonify({'error': 'Username sudah digunakan.'}), 409
+
+    user = User(
+        username=username,
+        nama_lengkap=(payload.get('nama_lengkap') or '').strip() or username,
+        email=(payload.get('email') or '').strip() or None,
+        role=role,
+        aktif=_bool_value(payload.get('aktif', True)),
+    )
+    user.set_password(password)
+    db.session.add(user)
+    db.session.flush()
+    _audit('CREATE_USER', entity_type='user', entity_id=user.id, detail=user.to_dict())
+    db.session.commit()
+    return jsonify(user.to_dict()), 201
+
+
+@app.route('/api/users/<int:user_id>', methods=['PATCH', 'POST'])
+@role_required('admin')
+def api_users_update(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({'error': 'User tidak ditemukan.'}), 404
+    payload = _request_payload()
+    role = (payload.get('role') or user.role).strip().lower()
+    if role not in ROLES:
+        return jsonify({'error': 'Role tidak valid.'}), 400
+    admin_count = User.query.filter_by(role='admin', aktif=True).count()
+    new_active = _bool_value(payload.get('aktif', user.aktif))
+    if user.role == 'admin' and (role != 'admin' or not new_active) and admin_count <= 1:
+        return jsonify({'error': 'Minimal harus ada satu admin aktif.'}), 400
+
+    before = user.to_dict()
+    user.nama_lengkap = (payload.get('nama_lengkap') or user.nama_lengkap or user.username).strip()
+    user.email = (payload.get('email') or '').strip() or None
+    user.role = role
+    user.aktif = new_active
+    db.session.flush()
+    _audit('UPDATE_USER', entity_type='user', entity_id=user.id, detail={
+        'before': before,
+        'after': user.to_dict(),
+    })
+    db.session.commit()
+    return jsonify(user.to_dict())
+
+
+@app.route('/api/users/<int:user_id>/password', methods=['POST'])
+@role_required('admin')
+def api_users_reset_password(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({'error': 'User tidak ditemukan.'}), 404
+    payload = _request_payload()
+    password = payload.get('password') or ''
+    password_error = _validate_password_policy(password)
+    if password_error:
+        return jsonify({'error': password_error}), 400
+    user.set_password(password)
+    db.session.flush()
+    _audit('RESET_USER_PASSWORD', entity_type='user', entity_id=user.id, detail={'username': user.username})
+    db.session.commit()
+    return jsonify({'message': 'Password berhasil direset.'})
+
+
+@app.route('/api/me/password', methods=['POST'])
+def api_change_own_password():
+    user = getattr(g, 'current_user', None)
+    if not user:
+        return jsonify({'error': 'Login diperlukan.'}), 401
+    payload = _request_payload()
+    current_password = payload.get('current_password') or ''
+    new_password = payload.get('new_password') or ''
+    if not user.check_password(current_password):
+        return jsonify({'error': 'Password lama tidak sesuai.'}), 400
+    password_error = _validate_password_policy(new_password)
+    if password_error:
+        return jsonify({'error': password_error}), 400
+    user.set_password(new_password)
+    db.session.flush()
+    _audit('CHANGE_OWN_PASSWORD', entity_type='user', entity_id=user.id, detail={'username': user.username})
+    db.session.commit()
+    return jsonify({'message': 'Password berhasil diganti.'})
+
+
 @app.route('/api/upload', methods=['POST'])
+@role_required('admin', 'operator')
 def api_upload():
     """
     Upload file NKWh Excel/CSV.
@@ -410,6 +1003,11 @@ def api_upload():
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'Nama file kosong'}), 400
+    try:
+        _check_upload_rate()
+        _validate_upload_file(file, ALLOWED_GENERIC_UPLOADS)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
 
     # TODO: integrasikan dengan UploadEngine dari upload_engine.py
     # from upload_engine import UploadEngine
@@ -468,6 +1066,7 @@ def _previous_month(period):
 
 
 def _read_upload_table(file):
+    _validate_upload_file(file, ALLOWED_GENERIC_UPLOADS)
     filename = file.filename.lower()
     if filename.endswith(('.xlsx', '.xlsm', '.xls')):
         frame = pd.read_excel(file)
@@ -476,6 +1075,8 @@ def _read_upload_table(file):
     else:
         raise ValueError('Format file harus CSV atau Excel (.xlsx/.xls)')
     frame = frame.dropna(how='all')
+    if len(frame) > app.config['MAX_IMPORT_ROWS']:
+        raise ValueError(f'Jumlah baris melebihi batas {app.config["MAX_IMPORT_ROWS"]}.')
     frame.columns = [_norm_col(col) for col in frame.columns]
     return frame
 
@@ -772,6 +1373,7 @@ def _import_nkwh_exim_rows(exim_rows, period):
 
 
 @app.route('/api/nkwh/analyze', methods=['POST'])
+@role_required('admin', 'operator')
 def api_nkwh_analyze():
     if 'file' not in request.files:
         return jsonify({'error': 'Tidak ada file yang dikirim'}), 400
@@ -780,14 +1382,28 @@ def api_nkwh_analyze():
         return jsonify({'error': 'Nama file kosong'}), 400
 
     try:
+        _check_upload_rate()
+        safe_filename, _ = _validate_upload_file(file, ALLOWED_NKWH_UPLOADS)
         result = analyze_workbook(file.stream)
-        result['filename'] = file.filename
+        if result.get('kwh_penyulang', {}).get('feeder_count', 0) > app.config['MAX_IMPORT_ROWS']:
+            return jsonify({'error': f'Jumlah data penyulang melebihi batas {app.config["MAX_IMPORT_ROWS"]}.'}), 400
+        result['filename'] = safe_filename
+        _audit('ANALYZE_NKWH', entity_type='upload', detail={
+            'filename': safe_filename,
+            'periode_bulan': result.get('periode_bulan'),
+            'feeder_count': result.get('kwh_penyulang', {}).get('feeder_count'),
+            'exim_rows': result.get('exim', {}).get('row_count'),
+        })
+        db.session.commit()
         return jsonify(result)
     except Exception as e:
+        db.session.rollback()
+        _safe_commit_audit('ANALYZE_NKWH', detail={'filename': file.filename, 'error': str(e)}, status='FAILED')
         return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/nkwh/import', methods=['POST'])
+@role_required('admin', 'operator')
 def api_nkwh_import():
     if 'file' not in request.files:
         return jsonify({'error': 'Tidak ada file yang dikirim'}), 400
@@ -801,7 +1417,11 @@ def api_nkwh_import():
     import_exim = request.form.get('import_exim', '1') == '1'
 
     try:
+        _check_upload_rate()
+        safe_filename, _ = _validate_upload_file(file, ALLOWED_NKWH_UPLOADS)
         parsed = parse_nkwh_feeders(file.stream)
+        if parsed.get('feeder_count', 0) > app.config['MAX_IMPORT_ROWS']:
+            return jsonify({'error': f'Jumlah data penyulang melebihi batas {app.config["MAX_IMPORT_ROWS"]}.'}), 400
         period = _nkwh_period(parsed.get('periode_bulan'), default_bulan or None)
         created = updated = alerts = 0
 
@@ -838,6 +1458,17 @@ def api_nkwh_import():
             exim = parse_exim_rows(file.stream)
             exim_created, exim_updated = _import_nkwh_exim_rows(exim.get('rows', []), period)
 
+        _audit('IMPORT_NKWH', entity_type='upload', detail={
+            'filename': safe_filename,
+            'periode_bulan': period.strftime('%Y-%m-%d'),
+            'created': created,
+            'updated': updated,
+            'alerts': alerts,
+            'exim_created': exim_created,
+            'exim_updated': exim_updated,
+            'feeder_count': parsed.get('feeder_count', 0),
+            'gi_count': parsed.get('gi_count', 0),
+        })
         db.session.commit()
         return jsonify({
             'message': 'Import NKWh selesai',
@@ -853,10 +1484,12 @@ def api_nkwh_import():
         })
     except Exception as e:
         db.session.rollback()
+        _safe_commit_audit('IMPORT_NKWH', detail={'filename': file.filename, 'error': str(e)}, status='FAILED')
         return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/upload-penyulang', methods=['POST'])
+@role_required('admin', 'operator')
 def api_upload_penyulang():
     if 'file' not in request.files:
         return jsonify({'error': 'Tidak ada file yang dikirim'}), 400
@@ -871,6 +1504,8 @@ def api_upload_penyulang():
     min_delta = request.form.get('min_delta', default=10000, type=float)
 
     try:
+        _check_upload_rate()
+        safe_filename, _ = _validate_upload_file(file, ALLOWED_GENERIC_UPLOADS)
         frame = _read_upload_table(file)
         created = updated = alerts = 0
         errors = []
@@ -917,8 +1552,19 @@ def api_upload_penyulang():
 
         if errors and not (created or updated):
             db.session.rollback()
+            _safe_commit_audit('IMPORT_PENYULANG', detail={
+                'filename': safe_filename,
+                'errors': errors[:10],
+            }, status='FAILED')
             return jsonify({'error': 'Upload gagal. Tidak ada baris valid.', 'errors': errors[:10]}), 400
 
+        _audit('IMPORT_PENYULANG', entity_type='upload', detail={
+            'filename': safe_filename,
+            'created': created,
+            'updated': updated,
+            'alerts': alerts,
+            'error_count': len(errors),
+        })
         db.session.commit()
         return jsonify({
             'message': 'Upload penyulang selesai',
@@ -930,12 +1576,34 @@ def api_upload_penyulang():
         })
     except Exception as e:
         db.session.rollback()
+        _safe_commit_audit('IMPORT_PENYULANG', detail={'filename': file.filename, 'error': str(e)}, status='FAILED')
         return jsonify({'error': str(e)}), 500
 
 
 # ════════════════════════════════════════════════
 # ERROR HANDLERS
 # ════════════════════════════════════════════════
+
+@app.errorhandler(403)
+def forbidden(e):
+    if _wants_json():
+        return jsonify({'error': 'Akses ditolak.'}), 403
+    return render_template('error.html',
+                           kode=403,
+                           judul='Akses Ditolak',
+                           pesan='Kamu tidak memiliki izin untuk membuka halaman ini.'), 403
+
+
+@app.errorhandler(413)
+def payload_too_large(e):
+    max_mb = app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
+    if _wants_json():
+        return jsonify({'error': f'Ukuran file melebihi batas {max_mb} MB.'}), 413
+    return render_template('error.html',
+                           kode=413,
+                           judul='File Terlalu Besar',
+                           pesan=f'Ukuran file melebihi batas {max_mb} MB.'), 413
+
 
 @app.errorhandler(404)
 def not_found(e):

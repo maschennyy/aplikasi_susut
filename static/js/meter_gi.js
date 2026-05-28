@@ -3,6 +3,14 @@
 const METER_MONTH_SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
 const METER_MONTH_FULL = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const TRAFO_COLORS = ['#1769e0', '#139a57', '#c77800', '#6d5dfc', '#d03939'];
+const METER_PAGE = Object.assign({
+  mode: 'utama',
+  primaryLabel: 'Meter Utama',
+  secondaryLabel: 'Meter Pembanding',
+  primaryShort: 'MU',
+  secondaryShort: 'MP',
+  exportName: 'kwh_utama',
+}, window.METER_PAGE || {});
 
 let meterState = {
   gi: [],
@@ -162,8 +170,8 @@ function createTrafoSummary(trafo) {
 }
 
 function renderMetrics(summary) {
-  setText('meter-total-mu', fmtNum(summary.totalMU));
-  setText('meter-total-mp', fmtNum(summary.totalMP));
+  setText('meter-total-mu', fmtNum(getPrimaryTotal(summary)));
+  setText('meter-total-mp', fmtNum(getSecondaryTotal(summary)));
   setText('meter-trafo-count', String(summary.trafos.length));
   setText('meter-focus-deviasi', `${summary.focusDeviasi.toFixed(2)}%`);
   setText('meter-focus-label', `${METER_MONTH_FULL[meterState.month]} ${meterState.year}`);
@@ -174,7 +182,7 @@ function renderMetrics(summary) {
   if (pills) {
     pills.innerHTML = `
       <span class="badge badge-ok">${summary.trafos.length} trafo</span>
-      <span class="badge badge-warn">${fmtNum(summary.focusMU)} kWh fokus</span>
+      <span class="badge badge-warn">${fmtNum(getPrimaryMonth(summary)[meterState.month])} kWh fokus</span>
       <span class="badge badge-danger">Deviasi ${summary.focusDeviasi.toFixed(2)}%</span>`;
   }
 }
@@ -189,6 +197,10 @@ function renderTrafoCards(summary) {
   }
 
   grid.innerHTML = summary.trafos.map((trafo, idx) => {
+    const primarySeries = getPrimaryTrafoSeries(trafo);
+    const secondarySeries = getSecondaryTrafoSeries(trafo);
+    const focusPrimary = primarySeries[meterState.month] || 0;
+    const focusSecondary = secondarySeries[meterState.month] || 0;
     const focusMU = trafo.mu[meterState.month] || 0;
     const focusMP = trafo.mp[meterState.month] || 0;
     const deviasi = focusMU ? ((focusMU - focusMP) / focusMU) * 100 : 0;
@@ -204,9 +216,9 @@ function renderTrafoCards(summary) {
           </div>
           <i class="ti ti-transformer" aria-hidden="true"></i>
         </div>
-        <div class="trafo-card-value">${fmtNum(focusMU)}</div>
+        <div class="trafo-card-value">${fmtNum(focusPrimary)}</div>
         <div class="trafo-card-meta">
-          <span>${fmtNum(focusMP)} kWh MP</span>
+          <span>${fmtNum(focusSecondary)} kWh ${escapeHTML(METER_PAGE.secondaryShort)}</span>
           <span class="badge ${badgeClass}">${deviasi.toFixed(2)}%</span>
         </div>
         <div class="trafo-card-foot">${trafo.kapasitas ? trafo.kapasitas.toFixed(0) + ' MVA' : 'Kapasitas belum diisi'}</div>
@@ -220,13 +232,15 @@ function renderCharts(summary) {
 
   const trend = qid('chart-meter-trend');
   if (trend) {
+    const primaryMonth = getPrimaryMonth(summary);
+    const secondaryMonth = getSecondaryMonth(summary);
     meterState.charts['chart-meter-trend'] = new Chart(trend, {
       type: 'line',
       data: {
         labels: METER_MONTH_SHORT,
         datasets: [
-          makeLineDataset('Meter Utama', summary.monthMU, '#1769e0'),
-          makeLineDataset('Meter Pembanding', summary.monthMP, '#139a57'),
+          makeLineDataset(METER_PAGE.primaryLabel, primaryMonth, '#1769e0'),
+          makeLineDataset(METER_PAGE.secondaryLabel, secondaryMonth, '#139a57'),
         ]
       },
       options: chartOptions()
@@ -240,8 +254,8 @@ function renderCharts(summary) {
       data: {
         labels: summary.trafos.map(t => t.kode),
         datasets: [{
-          label: 'MU',
-          data: summary.trafos.map(t => t.mu[meterState.month] || 0),
+          label: METER_PAGE.primaryShort,
+          data: summary.trafos.map(t => getPrimaryTrafoSeries(t)[meterState.month] || 0),
           backgroundColor: summary.trafos.map((_, idx) => TRAFO_COLORS[idx % TRAFO_COLORS.length]),
           borderRadius: 7,
           borderSkipped: false,
@@ -278,11 +292,13 @@ function renderTable(summary) {
   }
 
   tbody.innerHTML = summary.trafos.map(trafo => {
-    const monthCells = trafo.mu.map((value, idx) => {
+    const primarySeries = getPrimaryTrafoSeries(trafo);
+    const monthCells = primarySeries.map((value, idx) => {
       const classes = ['tr', 'mono'];
       if (idx === meterState.month) classes.push('focus-month');
       return `<td class="${classes.join(' ')}">${fmtNum(value)}</td>`;
     }).join('');
+    const primaryTotal = getPrimaryTrafoTotal(trafo);
     const deviasiYear = trafo.totalMU ? ((trafo.totalMU - trafo.totalMP) / trafo.totalMU) * 100 : 0;
     const devClass = Math.abs(deviasiYear) > 1 ? 'badge-danger' : Math.abs(deviasiYear) > .5 ? 'badge-warn' : 'badge-ok';
 
@@ -294,7 +310,7 @@ function renderTable(summary) {
         </td>
         <td>${trafo.kapasitas ? trafo.kapasitas.toFixed(0) + ' MVA' : '-'}</td>
         ${monthCells}
-        <td class="tr mono"><strong>${fmtNum(trafo.totalMU)}</strong></td>
+        <td class="tr mono"><strong>${fmtNum(primaryTotal)}</strong></td>
         <td class="tr"><span class="badge ${devClass}">${deviasiYear.toFixed(2)}%</span></td>
       </tr>`;
   }).join('');
@@ -309,20 +325,61 @@ function renderEmpty(message) {
 
 function exportMeterCSV() {
   const summary = buildMeterSummary();
-  const rows = [['Kode Trafo','Nama Trafo','Kapasitas MVA',...METER_MONTH_SHORT,'Total MU','Total MP','Deviasi Tahun']];
+  const rows = [['Kode Trafo','Nama Trafo','Kapasitas MVA',...METER_MONTH_SHORT,`Total ${METER_PAGE.primaryShort}`,'Total MU','Total MP','Deviasi Tahun']];
   summary.trafos.forEach(t => {
     const deviasi = t.totalMU ? ((t.totalMU - t.totalMP) / t.totalMU) * 100 : 0;
-    rows.push([t.kode, t.nama, t.kapasitas, ...t.mu.map(v => Math.round(v)), Math.round(t.totalMU), Math.round(t.totalMP), deviasi.toFixed(2)]);
+    rows.push([
+      t.kode,
+      t.nama,
+      t.kapasitas,
+      ...getPrimaryTrafoSeries(t).map(v => Math.round(v)),
+      Math.round(getPrimaryTrafoTotal(t)),
+      Math.round(t.totalMU),
+      Math.round(t.totalMP),
+      deviasi.toFixed(2),
+    ]);
   });
   const csv = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = Object.assign(document.createElement('a'), {
     href: url,
-    download: `main_meter_gi_${meterState.year}.csv`,
+    download: `${METER_PAGE.exportName}_${meterState.year}.csv`,
   });
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function usePembanding() {
+  return METER_PAGE.mode === 'pembanding';
+}
+
+function getPrimaryMonth(summary) {
+  return usePembanding() ? summary.monthMP : summary.monthMU;
+}
+
+function getSecondaryMonth(summary) {
+  return usePembanding() ? summary.monthMU : summary.monthMP;
+}
+
+function getPrimaryTotal(summary) {
+  return usePembanding() ? summary.totalMP : summary.totalMU;
+}
+
+function getSecondaryTotal(summary) {
+  return usePembanding() ? summary.totalMU : summary.totalMP;
+}
+
+function getPrimaryTrafoSeries(trafo) {
+  return usePembanding() ? trafo.mp : trafo.mu;
+}
+
+function getSecondaryTrafoSeries(trafo) {
+  return usePembanding() ? trafo.mu : trafo.mp;
+}
+
+function getPrimaryTrafoTotal(trafo) {
+  return usePembanding() ? trafo.totalMP : trafo.totalMU;
 }
 
 async function getJSON(url, fallback) {

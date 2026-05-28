@@ -11,12 +11,8 @@
 
   <div class="coming-soon-wrap">
     <div class="cs-icon"><i class="ti ti-{{ icon }}" aria-hidden="true"></i></div>
-    <h2 class="cs-title">Modul Belum Diaktifkan</h2>
-    <p class="cs-desc">{{ desc }}<br>Route ini sudah aman dibuka dan siap dilanjutkan pada tahap berikutnya.</p>
-    <a href="{{ url_for('dashboard') }}" class="btn-outline" style="margin-top:16px;display:inline-flex">
-      <i class="ti ti-arrow-left" aria-hidden="true"></i>
-      Kembali ke Dashboard
-    </a>
+    <h2 class="cs-title">{{ judul }}</h2>
+    <p class="cs-desc">{{ desc }}</p>
   </div>
 </div>
 {% endblock %}

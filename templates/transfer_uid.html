@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Transfer Antar UID - Susut Energi{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-eyebrow">UID</div>
+      <h1 class="page-title">Transfer Antar UID</h1>
+    </div>
+    <div class="topbar-right">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span id="uid-transfer-live">Memuat</span>
+      </div>
+      <div class="filter-pill">
+        <span class="fp-label">Tahun</span>
+        <select id="uid-transfer-tahun" class="fp-select"></select>
+        <button id="btn-refresh-uid-transfer" class="fp-btn" title="Refresh">
+          <i class="ti ti-refresh" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="metric-grid">
+    <div class="metric-card mc-blue">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Ekspor</span>
+          <div class="mc-icon"><i class="ti ti-arrow-up-right" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="uid-export">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">kWh keluar</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-green">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Impor</span>
+          <div class="mc-icon"><i class="ti ti-arrow-down-left" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="uid-import">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">kWh masuk</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-amber">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Netto</span>
+          <div class="mc-icon"><i class="ti ti-scale" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="uid-netto">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">ekspor dikurangi impor</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-danger">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Transaksi</span>
+          <div class="mc-icon"><i class="ti ti-arrows-transfer-up" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="uid-count">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">baris transfer</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Tren Transfer</div>
+      </div>
+      <div class="chart-box" style="height:270px">
+        <canvas id="chart-uid-transfer" role="img" aria-label="Tren transfer antar UID"></canvas>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Arah Energi</div>
+      </div>
+      <div class="chart-box" style="height:270px">
+        <canvas id="chart-uid-direction" role="img" aria-label="Komposisi ekspor impor"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div class="panel-title">Detail Transfer Antar UID</div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table exim-schema-table" id="table-uid-transfer">
+        <thead>
+          <tr>
+            <th>Periode</th>
+            <th>Unit Asal</th>
+            <th>Unit Tujuan</th>
+            <th>GI / Interbus</th>
+            <th>Arah</th>
+            <th class="tr">kWh Transfer</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="6" class="empty-cell">Memuat data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/transfer_uid.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Susut Energi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="auth-body">
+  <main class="auth-shell">
+    <section class="auth-card">
+      <div class="auth-mark">
+        <i class="ti ti-bolt" aria-hidden="true"></i>
+      </div>
+      <div class="auth-head">
+        <h1>EnergySus</h1>
+        <p>Masuk untuk mengakses data susut energi.</p>
+      </div>
+
+      {% if error %}
+        <div class="auth-alert">
+          <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+          <span>{{ error }}</span>
+        </div>
+      {% endif %}
+
+      <form method="post" class="auth-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ next_url or '' }}">
+        <label class="field">
+          <span>Username</span>
+          <input name="username" type="text" autocomplete="username" required autofocus>
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button class="primary-action auth-submit" type="submit">
+          <i class="ti ti-login" aria-hidden="true"></i>
+          Masuk
+        </button>
+      </form>
+
+      <div class="auth-foot">
+        {% if not config.SECURITY_REQUIRE_LOGIN %}
+          Mode login sedang nonaktif.
+        {% else %}
+          Akun admin dibuat lewat variabel `ADMIN_USERNAME` dan `ADMIN_PASSWORD` atau perintah `flask --app app create-admin`.
+        {% endif %}
+      </div>
+    </section>
+  </main>
+</body>
+</html>
