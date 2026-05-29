@@ -16,6 +16,21 @@
     </div>
   </div>
 
+  <section class="upload-flow" aria-label="Tahapan upload">
+    <div class="upload-step is-active" id="upload-step-file">
+      <span>1</span>
+      <strong>Pilih File</strong>
+    </div>
+    <div class="upload-step" id="upload-step-validate">
+      <span>2</span>
+      <strong>Validasi</strong>
+    </div>
+    <div class="upload-step" id="upload-step-import">
+      <span>3</span>
+      <strong>Import</strong>
+    </div>
+  </section>
+
   <section class="panel panel-full">
     <div class="panel-header">
       <div class="panel-title">File Workbook</div>
@@ -24,7 +39,7 @@
           <i class="ti ti-scan" aria-hidden="true"></i>
           Analisa
         </button>
-        <button class="primary-action" id="btn-import-nkwh" type="button">
+        <button class="primary-action" id="btn-import-nkwh" type="button" disabled>
           <i class="ti ti-database-import" aria-hidden="true"></i>
           Import
         </button>
@@ -34,6 +49,14 @@
       <label class="field nkwh-file-field">
         <span>Workbook NKWh</span>
         <input id="nkwh-file" name="file" type="file" accept=".xlsx,.xlsm" required>
+      </label>
+      <label class="field">
+        <span>Jenis Data</span>
+        <select id="nkwh-source-type" name="source_type">
+          <option value="nkwh">NKWh Bulanan</option>
+          <option value="penyulang">kWh Penyulang</option>
+          <option value="exim">Transfer EXIM</option>
+        </select>
       </label>
       <label class="field">
         <span>Default Bulan</span>
@@ -53,6 +76,31 @@
       </label>
     </form>
     <div class="upload-result-bar" id="nkwh-result">Belum ada file dianalisa.</div>
+  </section>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Validasi Data</div>
+        <div class="panel-sub" id="nkwh-validation-summary">Analisa workbook untuk melihat kesiapan import.</div>
+      </div>
+      <div class="pills-row" id="nkwh-validation-pills"></div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table exim-schema-table" id="table-nkwh-validation">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Area</th>
+            <th>Temuan</th>
+            <th class="tr">Jumlah</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="4" class="empty-cell">Belum ada validasi.</td></tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <div class="metric-grid">

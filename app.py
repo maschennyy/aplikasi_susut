@@ -10,7 +10,7 @@ from models import (db, GarduInduk, Trafo, Penyulang,
                     MeterReading, FeederReading,
                     TransferAntarUnit, RekapBulanan,
                     EximRule, EximMonthlyResult,
-                    User, AuditLog)
+                    User, AuditLog, AreaUnit)
 from nkwh_excel import analyze_workbook, parse_nkwh_feeders, parse_exim_rows
 from sqlalchemy import func, text, inspect
 from sqlalchemy import and_
@@ -550,6 +550,15 @@ def halaman_profile():
         eyebrow='Akun', judul='Profile',
         icon='user-circle', desc='Informasi akun dan preferensi akses aplikasi.')
 
+
+@app.route('/master-data')
+@role_required('admin', 'operator')
+def halaman_master_data():
+    return render_template('master_data.html',
+        eyebrow='Data Master', judul='Master Data',
+        icon='database', desc='Kelola master GI, trafo, penyulang, dan area/UP3.')
+
+
 @app.route('/upload')
 @role_required('admin', 'operator')
 def halaman_upload():
@@ -599,36 +608,278 @@ def api_sidebar_stats():
 # API — MASTER DATA
 # ════════════════════════════════════════════════
 
-@app.route('/api/gardu-induk')
-def api_gardu_induk():
+def _master_writer_required():
+    user = getattr(g, 'current_user', None)
+    if not user or user.role not in WRITE_ROLES:
+        return _json_error('Akses ubah master data hanya untuk admin/operator.', 403)
+    return None
+
+
+def _clean_value(value, default=''):
+    text_value = str(value or '').strip()
+    return text_value if text_value else default
+
+
+def _decimal_payload(value, default='0'):
+    if value in (None, ''):
+        return Decimal(default)
+    return Decimal(str(value))
+
+
+@app.route('/api/master-data/summary')
+def api_master_summary():
     try:
-        gis = GarduInduk.query.filter_by(aktif=True).order_by(GarduInduk.nama_gi).all()
-        return jsonify([g.to_dict() for g in gis])
+        active_gi = GarduInduk.query.filter_by(aktif=True).count()
+        active_trafo = Trafo.query.filter_by(aktif=True).count()
+        active_penyulang = Penyulang.query.filter_by(aktif=True).count()
+        active_area = AreaUnit.query.filter_by(aktif=True).count()
+        missing_area = Penyulang.query.filter(Penyulang.aktif.is_(True)).filter(
+            (Penyulang.area_up3.is_(None)) | (Penyulang.area_up3 == '')
+        ).count()
+        trafo_without_feeder = sum(1 for trafo in Trafo.query.filter_by(aktif=True).all() if not trafo.penyulangs)
+        return jsonify({
+            'gi': active_gi,
+            'trafo': active_trafo,
+            'penyulang': active_penyulang,
+            'area_unit': active_area,
+            'missing_area': missing_area,
+            'trafo_without_feeder': trafo_without_feeder,
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/trafo')
+@app.route('/api/area-unit', methods=['GET', 'POST'])
+def api_area_unit():
+    try:
+        if request.method == 'POST':
+            denied = _master_writer_required()
+            if denied:
+                return denied
+            payload = _request_payload()
+            kode = _clean_value(payload.get('kode_unit')).upper()
+            nama = _clean_value(payload.get('nama_unit'))
+            if not kode or not nama:
+                return _json_error('Kode unit dan nama unit wajib diisi.', 400)
+            if AreaUnit.query.filter_by(kode_unit=kode).first():
+                return _json_error('Kode unit sudah terdaftar.', 409)
+            unit = AreaUnit(
+                kode_unit=kode,
+                nama_unit=nama,
+                jenis=_clean_value(payload.get('jenis'), 'UP3').upper(),
+                parent_unit=_clean_value(payload.get('parent_unit')) or None,
+                aktif=_bool_value(payload.get('aktif', True)),
+            )
+            db.session.add(unit)
+            _audit('CREATE_AREA_UNIT', entity_type='area_unit', detail={'kode_unit': kode})
+            db.session.commit()
+            return jsonify(unit.to_dict()), 201
+
+        q = AreaUnit.query
+        if request.args.get('all') != '1':
+            q = q.filter_by(aktif=True)
+        return jsonify([u.to_dict() for u in q.order_by(AreaUnit.jenis, AreaUnit.nama_unit).all()])
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/area-unit/<int:unit_id>', methods=['PATCH', 'POST'])
+def api_area_unit_update(unit_id):
+    denied = _master_writer_required()
+    if denied:
+        return denied
+    unit = db.session.get(AreaUnit, unit_id)
+    if not unit:
+        return _json_error('Area/unit tidak ditemukan.', 404)
+    payload = _request_payload()
+    kode = _clean_value(payload.get('kode_unit'), unit.kode_unit).upper()
+    nama = _clean_value(payload.get('nama_unit'), unit.nama_unit)
+    existing = AreaUnit.query.filter(AreaUnit.kode_unit == kode, AreaUnit.id != unit.id).first()
+    if existing:
+        return _json_error('Kode unit sudah dipakai area/unit lain.', 409)
+    unit.kode_unit = kode
+    unit.nama_unit = nama
+    unit.jenis = _clean_value(payload.get('jenis'), unit.jenis).upper()
+    unit.parent_unit = _clean_value(payload.get('parent_unit')) or None
+    unit.aktif = _bool_value(payload.get('aktif', unit.aktif))
+    _audit('UPDATE_AREA_UNIT', entity_type='area_unit', entity_id=unit.id, detail={'kode_unit': unit.kode_unit})
+    db.session.commit()
+    return jsonify(unit.to_dict())
+
+
+@app.route('/api/gardu-induk', methods=['GET', 'POST'])
+def api_gardu_induk():
+    try:
+        if request.method == 'POST':
+            denied = _master_writer_required()
+            if denied:
+                return denied
+            payload = _request_payload()
+            kode = _clean_value(payload.get('kode_gi')).upper()
+            nama = _clean_value(payload.get('nama_gi'))
+            if not kode or not nama:
+                return _json_error('Kode GI dan nama GI wajib diisi.', 400)
+            if GarduInduk.query.filter_by(kode_gi=kode).first():
+                return _json_error('Kode GI sudah terdaftar.', 409)
+            gi = GarduInduk(
+                kode_gi=kode,
+                nama_gi=nama,
+                area=_clean_value(payload.get('area')) or None,
+                unit=_clean_value(payload.get('unit')) or None,
+                alamat=_clean_value(payload.get('alamat')) or None,
+                aktif=_bool_value(payload.get('aktif', True)),
+            )
+            db.session.add(gi)
+            _audit('CREATE_GI', entity_type='gardu_induk', detail={'kode_gi': kode})
+            db.session.commit()
+            return jsonify(gi.to_dict()), 201
+
+        q = GarduInduk.query
+        if request.args.get('all') != '1':
+            q = q.filter_by(aktif=True)
+        gis = q.order_by(GarduInduk.nama_gi).all()
+        return jsonify([g.to_dict() for g in gis])
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/gardu-induk/<int:gi_id>', methods=['PATCH', 'POST'])
+def api_gardu_induk_update(gi_id):
+    denied = _master_writer_required()
+    if denied:
+        return denied
+    gi = db.session.get(GarduInduk, gi_id)
+    if not gi:
+        return _json_error('Gardu induk tidak ditemukan.', 404)
+    payload = _request_payload()
+    kode = _clean_value(payload.get('kode_gi'), gi.kode_gi).upper()
+    nama = _clean_value(payload.get('nama_gi'), gi.nama_gi)
+    existing = GarduInduk.query.filter(GarduInduk.kode_gi == kode, GarduInduk.id != gi.id).first()
+    if existing:
+        return _json_error('Kode GI sudah dipakai gardu induk lain.', 409)
+    gi.kode_gi = kode
+    gi.nama_gi = nama
+    gi.area = _clean_value(payload.get('area')) or None
+    gi.unit = _clean_value(payload.get('unit')) or None
+    gi.alamat = _clean_value(payload.get('alamat')) or None
+    gi.aktif = _bool_value(payload.get('aktif', gi.aktif))
+    _audit('UPDATE_GI', entity_type='gardu_induk', entity_id=gi.id, detail={'kode_gi': gi.kode_gi})
+    db.session.commit()
+    return jsonify(gi.to_dict())
+
+
+@app.route('/api/trafo', methods=['GET', 'POST'])
 def api_trafo():
     try:
+        if request.method == 'POST':
+            denied = _master_writer_required()
+            if denied:
+                return denied
+            payload = _request_payload()
+            gi = db.session.get(GarduInduk, int(payload.get('gi_id') or 0))
+            if not gi:
+                return _json_error('Gardu induk wajib dipilih.', 400)
+            kode = _clean_value(payload.get('kode_trafo')).upper()
+            nama = _clean_value(payload.get('nama_trafo'))
+            if not kode or not nama:
+                return _json_error('Kode trafo dan nama trafo wajib diisi.', 400)
+            if Trafo.query.filter_by(gi_id=gi.id, kode_trafo=kode).first():
+                return _json_error('Kode trafo sudah ada di GI ini.', 409)
+            trafo = Trafo(
+                gi_id=gi.id,
+                kode_trafo=kode,
+                nama_trafo=nama,
+                kapasitas_mva=_decimal_payload(payload.get('kapasitas_mva'), '0'),
+                tegangan_kv=_decimal_payload(payload.get('tegangan_kv'), '20'),
+                aktif=_bool_value(payload.get('aktif', True)),
+            )
+            db.session.add(trafo)
+            _audit('CREATE_TRAFO', entity_type='trafo', detail={'kode_trafo': kode, 'gi_id': gi.id})
+            db.session.commit()
+            return jsonify(trafo.to_dict()), 201
+
         gi_id = request.args.get('gi_id', type=int)
-        q = Trafo.query.filter_by(aktif=True)
+        q = Trafo.query
+        if request.args.get('all') != '1':
+            q = q.filter_by(aktif=True)
         if gi_id:
             q = q.filter_by(gi_id=gi_id)
         return jsonify([t.to_dict() for t in q.order_by(Trafo.kode_trafo).all()])
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/penyulang')
+@app.route('/api/trafo/<int:trafo_id>', methods=['PATCH', 'POST'])
+def api_trafo_update(trafo_id):
+    denied = _master_writer_required()
+    if denied:
+        return denied
+    trafo = db.session.get(Trafo, trafo_id)
+    if not trafo:
+        return _json_error('Trafo tidak ditemukan.', 404)
+    payload = _request_payload()
+    gi = db.session.get(GarduInduk, int(payload.get('gi_id') or trafo.gi_id))
+    if not gi:
+        return _json_error('Gardu induk tidak ditemukan.', 400)
+    kode = _clean_value(payload.get('kode_trafo'), trafo.kode_trafo).upper()
+    nama = _clean_value(payload.get('nama_trafo'), trafo.nama_trafo)
+    exists = Trafo.query.filter(Trafo.gi_id == gi.id, Trafo.kode_trafo == kode, Trafo.id != trafo.id).first()
+    if exists:
+        return _json_error('Kode trafo sudah ada di GI ini.', 409)
+    trafo.gi_id = gi.id
+    trafo.kode_trafo = kode
+    trafo.nama_trafo = nama
+    trafo.kapasitas_mva = _decimal_payload(payload.get('kapasitas_mva'), str(trafo.kapasitas_mva or 0))
+    trafo.tegangan_kv = _decimal_payload(payload.get('tegangan_kv'), str(trafo.tegangan_kv or 20))
+    trafo.aktif = _bool_value(payload.get('aktif', trafo.aktif))
+    _audit('UPDATE_TRAFO', entity_type='trafo', entity_id=trafo.id, detail={'kode_trafo': trafo.kode_trafo})
+    db.session.commit()
+    return jsonify(trafo.to_dict())
+
+
+@app.route('/api/penyulang', methods=['GET', 'POST'])
 def api_penyulang_list():
     try:
+        if request.method == 'POST':
+            denied = _master_writer_required()
+            if denied:
+                return denied
+            payload = _request_payload()
+            trafo = db.session.get(Trafo, int(payload.get('trafo_id') or 0))
+            if not trafo:
+                return _json_error('Trafo wajib dipilih.', 400)
+            kode = _clean_value(payload.get('kode_penyulang')).upper()
+            nama = _clean_value(payload.get('nama_penyulang'))
+            if not kode or not nama:
+                return _json_error('Kode penyulang dan nama penyulang wajib diisi.', 400)
+            if Penyulang.query.filter_by(trafo_id=trafo.id, kode_penyulang=kode).first():
+                return _json_error('Kode penyulang sudah ada di trafo ini.', 409)
+            status_value = _clean_value(payload.get('status'), 'AKTIF').upper()
+            penyulang = Penyulang(
+                trafo_id=trafo.id,
+                gi_id=trafo.gi_id,
+                kode_penyulang=kode,
+                nama_penyulang=nama,
+                jenis=_clean_value(payload.get('jenis'), 'REGULAR').upper(),
+                area_up3=_clean_value(payload.get('area_up3')) or None,
+                ex_cabang=_clean_value(payload.get('ex_cabang')) or None,
+                status=status_value,
+                aktif=_bool_value(payload.get('aktif', status_value != 'NONAKTIF')),
+            )
+            db.session.add(penyulang)
+            _audit('CREATE_PENYULANG', entity_type='penyulang', detail={'kode_penyulang': kode, 'trafo_id': trafo.id})
+            db.session.commit()
+            return jsonify(penyulang.to_dict()), 201
+
         trafo_id = request.args.get('trafo_id', type=int)
         gi_id    = request.args.get('gi_id',    type=int)
         area_up3 = request.args.get('area_up3', '').strip()
         status   = request.args.get('status', '').strip()
         q = Penyulang.query
-        if not status:
+        if not status and request.args.get('all') != '1':
             q = q.filter_by(aktif=True)
         if trafo_id:
             q = q.filter_by(trafo_id=trafo_id)
@@ -640,7 +891,44 @@ def api_penyulang_list():
             q = q.filter(Penyulang.status == status)
         return jsonify([p.to_dict() for p in q.order_by(Penyulang.kode_penyulang).all()])
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/penyulang/<int:penyulang_id>', methods=['PATCH', 'POST'])
+def api_penyulang_update(penyulang_id):
+    denied = _master_writer_required()
+    if denied:
+        return denied
+    penyulang = db.session.get(Penyulang, penyulang_id)
+    if not penyulang:
+        return _json_error('Penyulang tidak ditemukan.', 404)
+    payload = _request_payload()
+    trafo = db.session.get(Trafo, int(payload.get('trafo_id') or penyulang.trafo_id))
+    if not trafo:
+        return _json_error('Trafo tidak ditemukan.', 400)
+    kode = _clean_value(payload.get('kode_penyulang'), penyulang.kode_penyulang).upper()
+    nama = _clean_value(payload.get('nama_penyulang'), penyulang.nama_penyulang)
+    exists = Penyulang.query.filter(
+        Penyulang.trafo_id == trafo.id,
+        Penyulang.kode_penyulang == kode,
+        Penyulang.id != penyulang.id,
+    ).first()
+    if exists:
+        return _json_error('Kode penyulang sudah ada di trafo ini.', 409)
+    status_value = _clean_value(payload.get('status'), penyulang.status or 'AKTIF').upper()
+    penyulang.trafo_id = trafo.id
+    penyulang.gi_id = trafo.gi_id
+    penyulang.kode_penyulang = kode
+    penyulang.nama_penyulang = nama
+    penyulang.jenis = _clean_value(payload.get('jenis'), penyulang.jenis or 'REGULAR').upper()
+    penyulang.area_up3 = _clean_value(payload.get('area_up3')) or None
+    penyulang.ex_cabang = _clean_value(payload.get('ex_cabang')) or None
+    penyulang.status = status_value
+    penyulang.aktif = _bool_value(payload.get('aktif', penyulang.aktif))
+    _audit('UPDATE_PENYULANG', entity_type='penyulang', entity_id=penyulang.id, detail={'kode_penyulang': penyulang.kode_penyulang})
+    db.session.commit()
+    return jsonify(penyulang.to_dict())
 
 
 @app.route('/api/penyulang-area')
@@ -1372,6 +1660,13 @@ def _import_nkwh_exim_rows(exim_rows, period):
     return imported, updated
 
 
+def _nkwh_import_blockers(parsed):
+    blockers = []
+    if not parsed.get('feeder_count'):
+        blockers.append('Tidak ada data penyulang yang bisa diimport.')
+    return blockers
+
+
 @app.route('/api/nkwh/analyze', methods=['POST'])
 @role_required('admin', 'operator')
 def api_nkwh_analyze():
@@ -1422,6 +1717,9 @@ def api_nkwh_import():
         parsed = parse_nkwh_feeders(file.stream)
         if parsed.get('feeder_count', 0) > app.config['MAX_IMPORT_ROWS']:
             return jsonify({'error': f'Jumlah data penyulang melebihi batas {app.config["MAX_IMPORT_ROWS"]}.'}), 400
+        blockers = _nkwh_import_blockers(parsed)
+        if blockers:
+            return jsonify({'error': 'Import dibatalkan karena validasi gagal.', 'errors': blockers}), 400
         period = _nkwh_period(parsed.get('periode_bulan'), default_bulan or None)
         created = updated = alerts = 0
 

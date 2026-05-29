@@ -360,6 +360,7 @@ def analyze_workbook(source):
     feeders = parse_nkwh_feeders(wb) if 'kWh Penyulang' in wb.sheetnames else None
     tng = parse_tng_structure(wb)
     exim = parse_exim_rows(wb)
+    validation = validate_nkwh_workbook(wb, feeders, exim)
 
     return {
         'workbook': {
@@ -376,8 +377,91 @@ def analyze_workbook(source):
             key: value for key, value in exim.items()
             if key != 'rows'
         },
+        'validation': validation,
         'samples': {
             'feeders': (feeders or {}).get('feeders', [])[:8],
             'exim': exim.get('rows', [])[:8],
         },
+    }
+
+
+def validate_nkwh_workbook(wb, feeders, exim):
+    issues = []
+
+    def add(level, code, message, sheet='Workbook', row=None, count=None):
+        issues.append({
+            'level': level,
+            'code': code,
+            'message': message,
+            'sheet': sheet,
+            'row': row,
+            'count': count,
+        })
+
+    if 'kWh Penyulang' not in wb.sheetnames:
+        add('error', 'missing_feeder_sheet', 'Sheet kWh Penyulang tidak ditemukan.')
+    if not feeders or not feeders.get('feeder_count'):
+        add('error', 'no_feeder_rows', 'Tidak ada baris penyulang yang bisa dibaca.', 'kWh Penyulang')
+    elif not feeders.get('periode_bulan'):
+        add('warning', 'missing_period', 'Periode tidak terbaca dari workbook. Default Bulan akan dipakai saat import.', 'kWh Penyulang')
+
+    feeder_rows = (feeders or {}).get('feeders', [])
+    seen = Counter()
+    missing_gi = 0
+    missing_trafo = 0
+    zero_total = 0
+    incomplete_register = 0
+    invalid_stand = 0
+
+    for item in feeder_rows:
+        key = (
+            clean_text(item.get('gardu_induk')).upper(),
+            clean_text(item.get('kode_trafo')).upper(),
+            clean_text(item.get('kode_penyulang')).upper(),
+        )
+        seen[key] += 1
+        if not clean_text(item.get('gardu_induk')) or item.get('gardu_induk') == 'Belum Dipetakan':
+            missing_gi += 1
+        if not clean_text(item.get('kode_trafo')):
+            missing_trafo += 1
+        if not numeric(item.get('kwh_total')):
+            zero_total += 1
+        registers = item.get('registers') or {}
+        if 'wbp' not in registers or 'lwbp1' not in registers:
+            incomplete_register += 1
+        for reg in registers.values():
+            awal = reg.get('stand_awal')
+            akhir = reg.get('stand_akhir')
+            if awal is not None and akhir is not None and akhir < awal:
+                invalid_stand += 1
+
+    duplicate_count = sum(value - 1 for value in seen.values() if value > 1)
+    if duplicate_count:
+        add('warning', 'duplicate_feeder', f'{duplicate_count} baris penyulang terindikasi duplikat dalam GI/trafo yang sama.', 'kWh Penyulang', count=duplicate_count)
+    if missing_gi:
+        add('warning', 'missing_gi', f'{missing_gi} penyulang belum memiliki gardu induk yang jelas.', 'kWh Penyulang', count=missing_gi)
+    if missing_trafo:
+        add('warning', 'missing_trafo', f'{missing_trafo} penyulang belum memiliki kode trafo.', 'kWh Penyulang', count=missing_trafo)
+    if zero_total:
+        add('warning', 'zero_total', f'{zero_total} penyulang memiliki kWh total nol atau kosong.', 'kWh Penyulang', count=zero_total)
+    if incomplete_register:
+        add('warning', 'incomplete_register', f'{incomplete_register} penyulang belum lengkap register WBP/LWBP.', 'kWh Penyulang', count=incomplete_register)
+    if invalid_stand:
+        add('warning', 'invalid_stand', f'{invalid_stand} register memiliki stand akhir lebih kecil dari stand awal. Periksa apakah ini koreksi, rollover, atau memakai kWh manual.', 'kWh Penyulang', count=invalid_stand)
+
+    if exim and exim.get('row_count'):
+        no_method = sum(1 for row in exim.get('rows', []) if not clean_text(row.get('metode')))
+        if no_method:
+            add('warning', 'missing_exim_method', f'{no_method} baris EXIM belum memiliki metode.', exim.get('sheet') or 'Exim', count=no_method)
+    else:
+        add('info', 'no_exim_rows', 'Baris EXIM tidak ditemukan atau belum terbaca.', 'Exim')
+
+    summary = Counter(item['level'] for item in issues)
+    status = 'blocked' if summary.get('error') else 'warning' if summary.get('warning') else 'ready'
+    return {
+        'status': status,
+        'error_count': summary.get('error', 0),
+        'warning_count': summary.get('warning', 0),
+        'info_count': summary.get('info', 0),
+        'issues': issues[:40],
     }

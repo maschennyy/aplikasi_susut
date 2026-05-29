@@ -1,6 +1,7 @@
 'use strict';
 
 let lastAnalysis = null;
+let lastFileSignature = '';
 
 document.addEventListener('DOMContentLoaded', () => {
   const now = new Date();
@@ -9,6 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   on('btn-analyze-nkwh', 'click', () => submitNkwh('analyze'));
   on('btn-import-nkwh', 'click', () => submitNkwh('import'));
+  qid('nkwh-file')?.addEventListener('change', resetAnalysisState);
+  qid('nkwh-source-type')?.addEventListener('change', resetAnalysisState);
+  qid('nkwh-bulan')?.addEventListener('change', resetAnalysisState);
 });
 
 async function submitNkwh(mode) {
@@ -16,6 +20,11 @@ async function submitNkwh(mode) {
   const fileInput = qid('nkwh-file');
   if (!fileInput?.files.length) {
     setResult('Pilih workbook NKWh terlebih dahulu.', 'warning');
+    return;
+  }
+
+  if (mode === 'import' && !canImportCurrentFile()) {
+    setResult('Analisa file terlebih dahulu sampai validasi siap import.', 'warning');
     return;
   }
 
@@ -33,11 +42,13 @@ async function submitNkwh(mode) {
     if (mode === 'import') {
       setResult(`Import selesai: ${payload.created} baru, ${payload.updated} diperbarui, ${payload.alerts} alert, ${payload.exim_created} rule EXIM baru.`);
       if (window.showToast) window.showToast('Import NKWh selesai', 'success');
+      setStep('import');
       await submitNkwh('analyze');
       return;
     }
 
     lastAnalysis = payload;
+    lastFileSignature = fileSignature(fileInput.files[0]);
     renderAnalysis(payload);
     setResult(`Analisa selesai: ${payload.filename || 'workbook'} terbaca.`);
     if (window.showToast) window.showToast('Analisa NKWh selesai', 'success');
@@ -63,6 +74,55 @@ function renderAnalysis(data) {
   renderGi(feeder.by_gi || []);
   renderSample(data.samples?.feeders || []);
   renderMethods(exim.methods || []);
+  renderValidation(data.validation || {});
+  updateImportState();
+  setStep((data.validation || {}).status === 'blocked' ? 'validate' : 'import');
+}
+
+function renderValidation(validation) {
+  const status = validation.status || 'ready';
+  const errors = Number(validation.error_count || 0);
+  const warnings = Number(validation.warning_count || 0);
+  const infos = Number(validation.info_count || 0);
+  const issues = validation.issues || [];
+  const summary = qid('nkwh-validation-summary');
+  const pills = qid('nkwh-validation-pills');
+  const tbody = document.querySelector('#table-nkwh-validation tbody');
+
+  if (summary) {
+    summary.textContent = status === 'blocked'
+      ? 'Ada error yang harus diperbaiki sebelum import.'
+      : warnings
+        ? 'Data bisa diimport, tetapi ada catatan yang perlu diperiksa.'
+        : 'Data siap diimport.';
+  }
+
+  if (pills) {
+    pills.innerHTML = `
+      <span class="badge ${errors ? 'badge-danger' : 'badge-ok'}">${fmtNum(errors)} error</span>
+      <span class="badge ${warnings ? 'badge-warn' : 'badge-ok'}">${fmtNum(warnings)} warning</span>
+      <span class="badge badge-ok">${fmtNum(infos)} info</span>`;
+  }
+
+  if (!tbody) return;
+  if (!issues.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-cell">Tidak ada masalah terdeteksi.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = issues.map(issue => {
+    const badgeClass = issue.level === 'error' ? 'badge-danger' : issue.level === 'warning' ? 'badge-warn' : 'badge-ok';
+    return `
+      <tr>
+        <td><span class="badge ${badgeClass}">${escapeHTML(issue.level || '-')}</span></td>
+        <td>
+          <strong>${escapeHTML(issue.sheet || '-')}</strong>
+          <span class="subtext">${escapeHTML(issue.code || '-')}</span>
+        </td>
+        <td>${escapeHTML(issue.message || '-')}</td>
+        <td class="tr mono">${issue.count == null ? '-' : fmtNum(issue.count)}</td>
+      </tr>`;
+  }).join('');
 }
 
 function renderSheets(rows) {
@@ -133,6 +193,51 @@ function setResult(message, type = 'info') {
   if (!el) return;
   el.textContent = message;
   el.dataset.type = type;
+}
+
+function resetAnalysisState() {
+  lastAnalysis = null;
+  lastFileSignature = '';
+  updateImportState();
+  setStep('file');
+  setResult('File berubah. Jalankan analisa ulang sebelum import.');
+  setText('metric-sheet-count', '-');
+  setText('metric-feeder-count', '-');
+  setText('metric-total-kwh', '-');
+  setText('metric-exim-count', '-');
+  setText('metric-period', 'periode');
+  const validationBody = document.querySelector('#table-nkwh-validation tbody');
+  if (validationBody) validationBody.innerHTML = '<tr><td colspan="4" class="empty-cell">Belum ada validasi.</td></tr>';
+  setText('nkwh-validation-summary', 'Analisa workbook untuk melihat kesiapan import.');
+  const pills = qid('nkwh-validation-pills');
+  if (pills) pills.innerHTML = '';
+}
+
+function canImportCurrentFile() {
+  const file = qid('nkwh-file')?.files?.[0];
+  const validation = lastAnalysis?.validation || {};
+  return Boolean(file && lastAnalysis && lastFileSignature === fileSignature(file) && validation.status !== 'blocked');
+}
+
+function updateImportState() {
+  const btn = qid('btn-import-nkwh');
+  if (btn) btn.disabled = !canImportCurrentFile();
+}
+
+function fileSignature(file) {
+  if (!file) return '';
+  return [file.name, file.size, file.lastModified].join(':');
+}
+
+function setStep(step) {
+  const active = {
+    file: ['upload-step-file'],
+    validate: ['upload-step-file', 'upload-step-validate'],
+    import: ['upload-step-file', 'upload-step-validate', 'upload-step-import'],
+  }[step] || ['upload-step-file'];
+  ['upload-step-file', 'upload-step-validate', 'upload-step-import'].forEach(id => {
+    qid(id)?.classList.toggle('is-active', active.includes(id));
+  });
 }
 
 function formatPeriod(value) {

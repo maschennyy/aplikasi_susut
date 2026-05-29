@@ -1594,10 +1594,59 @@ body {
 
 .nkwh-upload-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 1.45fr) repeat(3, minmax(140px, .72fr)) auto;
+  grid-template-columns: minmax(260px, 1.45fr) repeat(4, minmax(130px, .72fr)) auto;
   gap: 12px;
   align-items: end;
   padding: 16px 20px 12px;
+}
+
+.upload-flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.upload-step {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  color: var(--soft);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.upload-step span {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  background: var(--card2);
+  border-radius: 9px;
+  font-family: var(--font-mono);
+  font-size: .75rem;
+  font-weight: 850;
+}
+
+.upload-step strong {
+  color: inherit;
+  font-size: .84rem;
+  font-weight: 850;
+}
+
+.upload-step.is-active {
+  color: var(--blue);
+  border-color: rgba(37, 99, 235, .22);
+  background: var(--blue-soft);
+}
+
+.upload-step.is-active span {
+  color: #fff;
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
 }
 
 .nkwh-file-field input[type="file"] {
@@ -1649,8 +1698,58 @@ body {
   border-color: rgba(199, 120, 0, .18);
 }
 
+.primary-action:disabled,
+.btn-outline:disabled {
+  cursor: not-allowed;
+  opacity: .52;
+  transform: none;
+}
+
 .nkwh-analysis-grid .compact-table {
   min-width: 100%;
+}
+
+.master-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px;
+}
+
+.master-pane {
+  display: none;
+}
+
+.master-pane.active {
+  display: block;
+}
+
+.master-editor-grid {
+  align-items: stretch;
+}
+
+.master-form {
+  align-content: start;
+}
+
+.master-actions {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.master-actions > * {
+  flex: 1 1 130px;
+}
+
+.master-table-wrap {
+  max-height: 520px;
+}
+
+.master-edit-btn {
+  min-height: 32px;
+  padding: 6px 9px;
+  font-size: .74rem;
 }
 
 .sb-logout-form {
@@ -1808,6 +1907,9 @@ body {
 @media (max-width: 820px) {
   .exim-flow-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .upload-flow {
+    grid-template-columns: 1fr;
   }
   .nkwh-upload-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -107,6 +107,36 @@ class AuditLog(db.Model):
 # ─────────────────────────────────────────────────────
 # 1. GARDU INDUK
 # ─────────────────────────────────────────────────────
+class AreaUnit(db.Model):
+    __tablename__ = 'area_unit'
+    __table_args__ = (
+        db.UniqueConstraint('kode_unit', name='uq_area_unit_kode'),
+    )
+
+    id          = db.Column(db.Integer, primary_key=True)
+    kode_unit   = db.Column(db.String(30), nullable=False)
+    nama_unit   = db.Column(db.String(100), nullable=False)
+    jenis       = db.Column(db.String(20), default='UP3')
+    parent_unit = db.Column(db.String(100))
+    aktif       = db.Column(db.Boolean, default=True)
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at  = db.Column(db.DateTime, default=datetime.utcnow,
+                            onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'kode_unit': self.kode_unit,
+            'nama_unit': self.nama_unit,
+            'jenis': self.jenis,
+            'parent_unit': self.parent_unit,
+            'aktif': self.aktif,
+        }
+
+    def __repr__(self):
+        return f'<AreaUnit {self.kode_unit} - {self.nama_unit}>'
+
+
 class GarduInduk(db.Model):
     __tablename__ = 'gardu_induk'
 
@@ -132,6 +162,8 @@ class GarduInduk(db.Model):
             'nama_gi':  self.nama_gi,
             'area':     self.area,
             'unit':     self.unit,
+            'alamat':   self.alamat,
+            'trafo_count': len(self.trafos) if self.trafos is not None else 0,
             'aktif':    self.aktif,
         }
 
@@ -174,6 +206,9 @@ class Trafo(db.Model):
             'nama_trafo':    self.nama_trafo,
             'kapasitas_mva': float(self.kapasitas_mva),
             'tegangan_kv':   float(self.tegangan_kv) if self.tegangan_kv else None,
+            'gi_kode':       self.gardu_induk.kode_gi if self.gardu_induk else None,
+            'gi_nama':       self.gardu_induk.nama_gi if self.gardu_induk else None,
+            'aktif':         self.aktif,
         }
 
     def __repr__(self):
@@ -223,6 +258,10 @@ class Penyulang(db.Model):
             'ex_cabang':      self.ex_cabang,
             'status':         self.status or ('AKTIF' if self.aktif else 'NONAKTIF'),
             'aktif':          self.aktif,
+            'gi_kode':        self.gardu_induk.kode_gi if self.gardu_induk else None,
+            'gi_nama':        self.gardu_induk.nama_gi if self.gardu_induk else None,
+            'kode_trafo':     self.trafo.kode_trafo if self.trafo else None,
+            'nama_trafo':     self.trafo.nama_trafo if self.trafo else None,
         }
 
     def __repr__(self):

@@ -93,6 +93,9 @@
     </div>
     <div class="exim-flow-grid">
       {% if user and user.role in ['admin', 'operator'] %}
+        <a class="exim-step" href="{{ url_for('halaman_master_data') }}"><span><i class="ti ti-database" aria-hidden="true"></i></span><strong>Master Data</strong></a>
+      {% endif %}
+      {% if user and user.role in ['admin', 'operator'] %}
         <a class="exim-step" href="{{ url_for('halaman_upload') }}"><span><i class="ti ti-upload" aria-hidden="true"></i></span><strong>Upload NKWh</strong></a>
       {% endif %}
       {% if user and user.role == 'admin' %}

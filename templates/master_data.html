@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Master Data - Susut Energi{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-eyebrow">Data Master</div>
+      <h1 class="page-title">Master Data</h1>
+    </div>
+    <div class="topbar-right">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span id="master-live">Memuat</span>
+      </div>
+      <button id="btn-refresh-master" class="btn-outline" type="button">
+        <i class="ti ti-refresh" aria-hidden="true"></i>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="metric-grid master-metrics">
+    <div class="metric-card mc-blue">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Gardu Induk</span>
+          <div class="mc-icon"><i class="ti ti-building-factory-2" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="master-count-gi">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">aktif</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-green">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Trafo</span>
+          <div class="mc-icon"><i class="ti ti-transformer" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="master-count-trafo">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">aktif</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-amber">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Penyulang</span>
+          <div class="mc-icon"><i class="ti ti-plug-connected" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="master-count-penyulang">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">aktif</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-danger">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Perlu Cek</span>
+          <div class="mc-icon"><i class="ti ti-alert-triangle" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="master-count-issues">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">relasi/data kosong</span></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="panel panel-full">
+    <div class="master-tabs" role="tablist" aria-label="Master data">
+      <button class="range-tab active" type="button" data-master-tab="area">Area/UP3</button>
+      <button class="range-tab" type="button" data-master-tab="gi">Gardu Induk</button>
+      <button class="range-tab" type="button" data-master-tab="trafo">Trafo</button>
+      <button class="range-tab" type="button" data-master-tab="penyulang">Penyulang</button>
+    </div>
+  </section>
+
+  <datalist id="master-area-options"></datalist>
+  <datalist id="master-unit-options"></datalist>
+
+  <section class="master-pane active" data-master-pane="area">
+    <div class="two-col master-editor-grid">
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Area / UP3</div>
+        </div>
+        <form class="security-form master-form" id="form-area">
+          <input type="hidden" name="id">
+          <label class="field">
+            <span>Kode</span>
+            <input name="kode_unit" autocomplete="off" required>
+          </label>
+          <label class="field">
+            <span>Nama Unit</span>
+            <input name="nama_unit" autocomplete="off" required>
+          </label>
+          <label class="field">
+            <span>Jenis</span>
+            <select name="jenis">
+              <option value="UID">UID</option>
+              <option value="UP3" selected>UP3</option>
+              <option value="AREA">Area</option>
+              <option value="ULP">ULP</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Parent</span>
+            <input name="parent_unit" list="master-unit-options" autocomplete="off">
+          </label>
+          <label class="toggle-field security-span">
+            <input name="aktif" type="checkbox" checked>
+            <span>Aktif</span>
+          </label>
+          <div class="master-actions security-span">
+            <button class="primary-action" type="submit"><i class="ti ti-device-floppy" aria-hidden="true"></i>Simpan</button>
+            <button class="btn-outline" type="button" data-reset-form="form-area"><i class="ti ti-plus" aria-hidden="true"></i>Baru</button>
+          </div>
+        </form>
+      </section>
+      <section class="panel">
+        <div class="panel-header"><div class="panel-title">Daftar Area / UP3</div></div>
+        <div class="table-scroll master-table-wrap">
+          <table class="data-table compact-table" id="table-area">
+            <thead><tr><th>Unit</th><th>Jenis</th><th>Parent</th><th>Status</th><th class="tr">Aksi</th></tr></thead>
+            <tbody><tr><td colspan="5" class="empty-cell">Memuat...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <section class="master-pane" data-master-pane="gi">
+    <div class="two-col master-editor-grid">
+      <section class="panel">
+        <div class="panel-header"><div class="panel-title">Gardu Induk</div></div>
+        <form class="security-form master-form" id="form-gi">
+          <input type="hidden" name="id">
+          <label class="field"><span>Kode GI</span><input name="kode_gi" autocomplete="off" required></label>
+          <label class="field"><span>Nama GI</span><input name="nama_gi" autocomplete="off" required></label>
+          <label class="field"><span>Area/UP3</span><input name="area" list="master-area-options" autocomplete="off"></label>
+          <label class="field"><span>UID/Unit</span><input name="unit" list="master-unit-options" autocomplete="off"></label>
+          <label class="field security-span"><span>Alamat</span><input name="alamat" autocomplete="off"></label>
+          <label class="toggle-field security-span"><input name="aktif" type="checkbox" checked><span>Aktif</span></label>
+          <div class="master-actions security-span">
+            <button class="primary-action" type="submit"><i class="ti ti-device-floppy" aria-hidden="true"></i>Simpan</button>
+            <button class="btn-outline" type="button" data-reset-form="form-gi"><i class="ti ti-plus" aria-hidden="true"></i>Baru</button>
+          </div>
+        </form>
+      </section>
+      <section class="panel">
+        <div class="panel-header"><div class="panel-title">Daftar Gardu Induk</div></div>
+        <div class="table-scroll master-table-wrap">
+          <table class="data-table compact-table" id="table-gi">
+            <thead><tr><th>GI</th><th>Area</th><th>Unit</th><th>Status</th><th class="tr">Aksi</th></tr></thead>
+            <tbody><tr><td colspan="5" class="empty-cell">Memuat...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <section class="master-pane" data-master-pane="trafo">
+    <div class="two-col master-editor-grid">
+      <section class="panel">
+        <div class="panel-header"><div class="panel-title">Trafo GI</div></div>
+        <form class="security-form master-form" id="form-trafo">
+          <input type="hidden" name="id">
+          <label class="field security-span"><span>Gardu Induk</span><select name="gi_id" required></select></label>
+          <label class="field"><span>Kode Trafo</span><input name="kode_trafo" autocomplete="off" required></label>
+          <label class="field"><span>Nama Trafo</span><input name="nama_trafo" autocomplete="off" required></label>
+          <label class="field"><span>Kapasitas MVA</span><input name="kapasitas_mva" type="number" min="0" step="0.01" required></label>
+          <label class="field"><span>Tegangan kV</span><input name="tegangan_kv" type="number" min="0" step="0.01"></label>
+          <label class="toggle-field security-span"><input name="aktif" type="checkbox" checked><span>Aktif</span></label>
+          <div class="master-actions security-span">
+            <button class="primary-action" type="submit"><i class="ti ti-device-floppy" aria-hidden="true"></i>Simpan</button>
+            <button class="btn-outline" type="button" data-reset-form="form-trafo"><i class="ti ti-plus" aria-hidden="true"></i>Baru</button>
+          </div>
+        </form>
+      </section>
+      <section class="panel">
+        <div class="panel-header"><div class="panel-title">Daftar Trafo</div></div>
+        <div class="table-scroll master-table-wrap">
+          <table class="data-table compact-table" id="table-trafo">
+            <thead><tr><th>Trafo</th><th>GI</th><th class="tr">MVA</th><th>Status</th><th class="tr">Aksi</th></tr></thead>
+            <tbody><tr><td colspan="5" class="empty-cell">Memuat...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <section class="master-pane" data-master-pane="penyulang">
+    <div class="two-col master-editor-grid">
+      <section class="panel">
+        <div class="panel-header"><div class="panel-title">Penyulang</div></div>
+        <form class="security-form master-form" id="form-penyulang">
+          <input type="hidden" name="id">
+          <label class="field"><span>Gardu Induk</span><select name="gi_id" id="master-feeder-gi" required></select></label>
+          <label class="field"><span>Trafo</span><select name="trafo_id" id="master-feeder-trafo" required></select></label>
+          <label class="field"><span>Kode</span><input name="kode_penyulang" autocomplete="off" required></label>
+          <label class="field"><span>Nama</span><input name="nama_penyulang" autocomplete="off" required></label>
+          <label class="field"><span>Jenis</span><select name="jenis"><option value="REGULAR">Regular</option><option value="INTERKONEKSI">Interkoneksi</option></select></label>
+          <label class="field"><span>Area/UP3</span><input name="area_up3" list="master-area-options" autocomplete="off"></label>
+          <label class="field"><span>Ex Cabang</span><input name="ex_cabang" autocomplete="off"></label>
+          <label class="field"><span>Status</span><select name="status"><option value="AKTIF">Aktif</option><option value="NONAKTIF">Nonaktif</option><option value="CADANGAN">Cadangan</option></select></label>
+          <label class="toggle-field security-span"><input name="aktif" type="checkbox" checked><span>Aktif</span></label>
+          <div class="master-actions security-span">
+            <button class="primary-action" type="submit"><i class="ti ti-device-floppy" aria-hidden="true"></i>Simpan</button>
+            <button class="btn-outline" type="button" data-reset-form="form-penyulang"><i class="ti ti-plus" aria-hidden="true"></i>Baru</button>
+          </div>
+        </form>
+      </section>
+      <section class="panel">
+        <div class="panel-header"><div class="panel-title">Daftar Penyulang</div></div>
+        <div class="table-scroll master-table-wrap">
+          <table class="data-table exim-schema-table" id="table-penyulang">
+            <thead><tr><th>Penyulang</th><th>GI</th><th>Trafo</th><th>Area</th><th>Status</th><th class="tr">Aksi</th></tr></thead>
+            <tbody><tr><td colspan="6" class="empty-cell">Memuat...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/master_data.js') }}"></script>
+{% endblock %}
