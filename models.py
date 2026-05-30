@@ -137,6 +137,39 @@ class AreaUnit(db.Model):
         return f'<AreaUnit {self.kode_unit} - {self.nama_unit}>'
 
 
+class MonthlyDataStatus(db.Model):
+    __tablename__ = 'monthly_data_status'
+    __table_args__ = (
+        db.UniqueConstraint('periode_bulan', name='uq_monthly_data_status_period'),
+    )
+
+    id             = db.Column(db.Integer, primary_key=True)
+    periode_bulan  = db.Column(db.Date, nullable=False)
+    status         = db.Column(db.String(30), default='DRAFT', nullable=False)
+    catatan        = db.Column(db.Text)
+    locked_at      = db.Column(db.DateTime)
+    locked_by      = db.Column(db.String(80))
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at     = db.Column(db.DateTime, default=datetime.utcnow,
+                               onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'periode': self.periode_bulan.strftime('%Y-%m'),
+            'periode_bulan': self.periode_bulan.strftime('%Y-%m-%d'),
+            'status': self.status,
+            'catatan': self.catatan,
+            'locked_at': self.locked_at.isoformat() if self.locked_at else None,
+            'locked_by': self.locked_by,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+    def __repr__(self):
+        return f'<MonthlyDataStatus {self.periode_bulan} - {self.status}>'
+
+
 class GarduInduk(db.Model):
     __tablename__ = 'gardu_induk'
 
@@ -647,6 +680,39 @@ class EximCustomerCharge(db.Model):
             'up3_pelanggan': self.up3_pelanggan,
             'kwh_jual': float(self.kwh_jual or 0),
             'catatan': self.catatan,
+        }
+
+
+class KwhJual(db.Model):
+    __tablename__ = 'kwh_jual'
+    __table_args__ = (
+        db.UniqueConstraint('gi_id', 'periode_bulan', 'sub_golongan',
+                            name='uq_kwh_jual_gi_bulan_sub'),
+    )
+
+    id             = db.Column(db.Integer, primary_key=True)
+    periode_bulan  = db.Column(db.Date, nullable=False)
+    gi_id          = db.Column(db.Integer, db.ForeignKey('gardu_induk.id'),
+                              nullable=False)
+    golongan       = db.Column(db.String(10), nullable=False)
+    sub_golongan   = db.Column(db.String(60), nullable=False)
+    tegangan       = db.Column(db.String(5), nullable=False)
+    kwh            = db.Column(db.Numeric(18, 3), default=0)
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at     = db.Column(db.DateTime, default=datetime.utcnow,
+                               onupdate=datetime.utcnow)
+
+    gardu_induk    = db.relationship('GarduInduk', backref='kwh_jual_rows')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'periode_bulan': self.periode_bulan.strftime('%Y-%m-%d'),
+            'gi_id': self.gi_id,
+            'golongan': self.golongan,
+            'sub_golongan': self.sub_golongan,
+            'tegangan': self.tegangan,
+            'kwh': float(self.kwh or 0),
         }
 
 

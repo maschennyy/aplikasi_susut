@@ -31,6 +31,95 @@
     </div>
   </section>
 
+  <section class="panel panel-full workflow-panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Workflow Validasi</div>
+        <div class="panel-sub" id="workflow-caption">Status data bulanan</div>
+      </div>
+      <div class="panel-actions">
+        <span class="badge badge-info" id="workflow-current-label">Draft</span>
+        <button class="btn-outline" id="btn-workflow-export" type="button">
+          <i class="ti ti-file-export" aria-hidden="true"></i>
+          Audit Package
+        </button>
+      </div>
+    </div>
+    <div class="workflow-body">
+      <div class="workflow-strip" id="workflow-strip" aria-label="Status validasi bulanan"></div>
+      <div class="workflow-update-row">
+        <label class="field">
+          <span>Status</span>
+          <select id="workflow-status-select">
+            <option value="DRAFT">Draft</option>
+            <option value="SUDAH_UPLOAD">Sudah Upload</option>
+            <option value="SUDAH_DICEK">Sudah Dicek</option>
+            <option value="FINAL">Final</option>
+            <option value="TERKUNCI">Terkunci</option>
+          </select>
+        </label>
+        <label class="field workflow-note-field">
+          <span>Catatan</span>
+          <input id="workflow-note" type="text" placeholder="Opsional">
+        </label>
+        <label class="toggle-field workflow-force-field" id="workflow-force-wrap">
+          <input id="workflow-force-final" type="checkbox">
+          <span>Override Final</span>
+        </label>
+        <button class="btn-outline" id="btn-workflow-refresh" type="button">
+          <i class="ti ti-refresh" aria-hidden="true"></i>
+          Refresh
+        </button>
+        <button class="primary-action" id="btn-workflow-save" type="button">
+          <i class="ti ti-check" aria-hidden="true"></i>
+          Update
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel panel-full readiness-panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Kesiapan Data</div>
+        <div class="panel-sub" id="workflow-readiness-caption">Coverage data periode</div>
+      </div>
+      <div class="pills-row">
+        <span class="badge badge-info" id="workflow-readiness-score">0%</span>
+        <span class="badge badge-warn" id="workflow-readiness-alert">0 alert</span>
+      </div>
+    </div>
+    <div class="readiness-grid" id="workflow-readiness-grid"></div>
+  </section>
+
+  <section class="panel panel-full monthly-activity-panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Riwayat Periode</div>
+        <div class="panel-sub" id="workflow-activity-caption">Aktivitas bulan berjalan</div>
+      </div>
+      <div class="pills-row">
+        <span class="badge badge-info" id="workflow-activity-count">0 aktivitas</span>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table monthly-activity-table" id="table-workflow-activity">
+        <thead>
+          <tr>
+            <th>Waktu</th>
+            <th>User</th>
+            <th>Aktivitas</th>
+            <th>Status</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="5" class="empty-cell">Belum ada aktivitas periode ini.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <section class="panel panel-full">
     <div class="panel-header">
       <div class="panel-title">File Workbook</div>

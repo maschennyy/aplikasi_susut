@@ -60,7 +60,7 @@ function initTahunSelect() {
 
 /* ── EVENTS ────────────────────────────────────────── */
 function bindEvents() {
-  on('periode',   'change', e => { currentPeriode = e.target.value; updateDashboard(); });
+  on('periode',   'change', e => { currentPeriode = e.target.value; updateDashboard(); loadExecutiveDashboard(); });
   on('tahun',     'change', e => { currentTahun = +e.target.value; loadData(); });
   on('btn-reset', 'click',  () => {
     setVal('periode', 'mei'); setVal('tahun', String(new Date().getFullYear()));
@@ -90,6 +90,7 @@ async function loadData() {
     setText('insight-mode', 'Live');
     setText('insight-year', currentTahun);
     updateDashboard();
+    loadExecutiveDashboard();
   } catch (err) {
     console.warn('API gagal, pakai demo data:', err.message);
     allData = demoData();
@@ -97,6 +98,7 @@ async function loadData() {
     setText('insight-mode', 'Demo');
     setText('insight-year', currentTahun);
     updateDashboard();
+    renderExecutiveDashboard(null);
   }
 }
 
@@ -127,6 +129,71 @@ function updateDashboard() {
 }
 
 /* ── METRIC CARDS ──────────────────────────────────── */
+async function loadExecutiveDashboard() {
+  const month = executiveMonth();
+  try {
+    const r = await fetch(`/api/executive-dashboard?tahun=${currentTahun}&month=${month}`);
+    if (!r.ok) throw new Error(r.statusText);
+    renderExecutiveDashboard(await r.json());
+  } catch (err) {
+    console.warn('Executive dashboard gagal:', err.message);
+    renderExecutiveDashboard(null);
+  }
+}
+
+function executiveMonth() {
+  const idx = MO_FULL.map(m => m.toLowerCase()).indexOf(String(currentPeriode || '').toLowerCase());
+  return idx >= 0 ? idx + 1 : new Date().getMonth() + 1;
+}
+
+function renderExecutiveDashboard(data) {
+  const month = executiveMonth();
+  setText('exec-period', `${MO_FULL[month - 1]} ${currentTahun}`);
+  if (!data || data.error) {
+    setText('exec-kwh-masuk', '-');
+    setText('exec-kwh-keluar', '-');
+    setText('exec-susut', '-');
+    setText('exec-readiness', '-');
+    setText('exec-workflow', '-');
+    renderExecutiveRows('exec-gi-deviasi', []);
+    renderExecutiveRows('exec-anomali', []);
+    return;
+  }
+  setText('exec-kwh-masuk', fmtN(data.total_kwh_masuk || 0));
+  setText('exec-kwh-keluar', fmtN(data.total_kwh_keluar || 0));
+  setText('exec-susut', `${fmtN(data.susut_kwh || 0)} (${Number(data.susut_persen || 0).toFixed(2)}%)`);
+  setText('exec-readiness', `${data.readiness?.score ?? 0}%`);
+  setText('exec-workflow', data.workflow?.label || '-');
+  renderExecutiveRows('exec-gi-deviasi', (data.gi_deviasi_terbesar || []).map(row => ({
+    title: row.nama_gi,
+    meta: `Deviasi ${fmtN(row.deviasi_kwh || 0)} kWh`,
+    value: `${Number(row.deviasi_persen || 0).toFixed(2)}%`,
+  })));
+  renderExecutiveRows('exec-anomali', (data.penyulang_anomali || []).map(row => ({
+    title: `${row.kode_penyulang || '-'} - ${row.penyulang || '-'}`,
+    meta: `${row.gardu_induk || '-'} - ${row.trafo || '-'}`,
+    value: `${Number(row.deviasi_persen || 0).toFixed(2)}%`,
+  })));
+}
+
+function renderExecutiveRows(id, rows) {
+  const el = qid(id);
+  if (!el) return;
+  if (!rows.length) {
+    el.innerHTML = '<div class="exec-empty">Belum ada data</div>';
+    return;
+  }
+  el.innerHTML = rows.map(row => `
+    <div class="exec-row">
+      <div>
+        <strong>${escapeHTML(row.title)}</strong>
+        <span>${escapeHTML(row.meta)}</span>
+      </div>
+      <b>${escapeHTML(row.value)}</b>
+    </div>
+  `).join('');
+}
+
 function renderMetricCards(agg, yd) {
   const p = (agg != null && agg.persentase_susut != null) ? agg.persentase_susut : null;
   const s = p === null ? null : p > TARGET ? 'danger' : p > TARGET * .88 ? 'warn' : 'ok';
@@ -433,6 +500,13 @@ const on     = (id, ev, fn) => qid(id)?.addEventListener(ev, fn);
 const pad    = n => String(n).padStart(2,'0');
 const now    = () => new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
 const fmtN   = n  => new Intl.NumberFormat('id-ID').format(Math.round(n));
+const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, char => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+}[char]));
 const hexAlpha = (hex, a) => {
   const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
   return `rgba(${r},${g},${b},${a})`;

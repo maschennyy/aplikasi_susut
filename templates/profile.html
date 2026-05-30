@@ -63,6 +63,20 @@
             </tbody>
           </table>
         </div>
+        <form class="profile-form" id="form-profile-info">
+          <label class="field">
+            <span>Nama</span>
+            <input name="nama_lengkap" value="{{ user.display_name if user else '' }}" autocomplete="name">
+          </label>
+          <label class="field">
+            <span>Email</span>
+            <input name="email" type="email" value="{{ user.email if user and user.email else '' }}" autocomplete="email">
+          </label>
+          <button class="primary-action" type="submit">
+            <i class="ti ti-device-floppy" aria-hidden="true"></i>
+            Simpan Profile
+          </button>
+        </form>
       </div>
     </section>
 

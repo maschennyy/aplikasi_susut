@@ -1,7 +1,7 @@
 'use strict';
 
 const ROLES = ['viewer', 'operator', 'auditor', 'admin'];
-let securityState = { users: [], audit: [] };
+let securityState = { users: [], audit: [], access: [] };
 
 document.addEventListener('DOMContentLoaded', async () => {
   bindSecurityEvents();
@@ -16,14 +16,16 @@ function bindSecurityEvents() {
 
 async function loadSecurity() {
   setLive('Memuat');
-  const [summary, users, audit] = await Promise.all([
+  const [summary, users, audit, access] = await Promise.all([
     getJSON('/api/security-summary', {}),
     getJSON('/api/users', []),
     getJSON('/api/audit-log?limit=100', []),
+    getJSON('/api/module-access', []),
   ]);
-  securityState = { users, audit };
+  securityState = { users, audit, access };
   renderSummary(summary);
   renderUsers(users);
+  renderModuleAccess(access);
   renderAudit(audit);
   fillResetUsers(users);
   setLive('Update ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
@@ -96,6 +98,33 @@ function renderAudit(rows) {
       <td>${escapeHTML(row.ip_address || '-')}</td>
       <td class="audit-detail">${escapeHTML(compactDetail(row.detail_json))}</td>
     </tr>`).join('');
+}
+
+function renderModuleAccess(rows) {
+  const tbody = document.querySelector('#table-module-access tbody');
+  if (!tbody) return;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">Belum ada matriks akses.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(row => {
+    const access = row.access || {};
+    return `
+      <tr>
+        <td>${escapeHTML(row.group || '-')}</td>
+        <td><strong>${escapeHTML(row.module || '-')}</strong></td>
+        <td>${roleBadges(access.read)}</td>
+        <td>${roleBadges(access.write || access.self_update)}</td>
+        <td>${roleBadges(access.export || access.audit)}</td>
+        <td>${roleBadges([...(access.finalize || []), ...(access.lock || [])])}</td>
+      </tr>`;
+  }).join('');
+}
+
+function roleBadges(roles) {
+  const unique = [...new Set(roles || [])];
+  if (!unique.length) return '<span class="subtext">-</span>';
+  return unique.map(role => `<span class="badge badge-neutral">${escapeHTML(title(role))}</span>`).join(' ');
 }
 
 function fillResetUsers(users) {

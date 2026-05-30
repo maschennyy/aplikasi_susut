@@ -27,6 +27,11 @@
 </head>
 <body>
 {% set active_user = current_user() %}
+{% set gi_group = ['halaman_penyulang', 'halaman_kwh_utama', 'halaman_meter_gi', 'halaman_kwh_pembanding', 'halaman_psgi', 'halaman_deviasi'] %}
+{% set uid_group = ['halaman_transfer_antar_uid', 'halaman_transfer', 'halaman_proporsional'] %}
+{% set master_group = ['halaman_rekap', 'halaman_master_data'] %}
+{% set transaksi_group = ['halaman_kwh_jual', 'halaman_emin'] %}
+{% set profile_group = ['halaman_profile', 'halaman_upload', 'halaman_security'] %}
 
 <div class="app-layout">
   <aside class="sidebar" id="sidebar">
@@ -58,56 +63,61 @@
           <span class="sb-nav-label">Dashboard</span>
         </a>
 
-        <span class="sb-nav-section">Gardu Induk</span>
+        <div class="sb-nav-group {{ 'open' if request.endpoint in gi_group else '' }}" data-sidebar-group="gi">
+          <button class="sb-nav-parent {{ 'active' if request.endpoint in gi_group else '' }}" type="button" aria-expanded="{{ 'true' if request.endpoint in gi_group else 'false' }}" data-tip="Gardu Induk">
+            <i class="ti ti-building-factory-2" aria-hidden="true"></i>
+            <span class="sb-nav-label">Gardu Induk</span>
+            <i class="ti ti-chevron-down sb-group-chevron" aria-hidden="true"></i>
+          </button>
+          <div class="sb-subnav">
+            <a href="{{ url_for('halaman_penyulang') }}" class="sb-nav-item sb-subnav-item {{ 'active' if request.endpoint == 'halaman_penyulang' }}" data-tip="kWh Penyulang"><span>kWh Penyulang</span></a>
+            <a href="{{ url_for('halaman_kwh_utama') }}" class="sb-nav-item sb-subnav-item {{ 'active' if request.endpoint in ['halaman_kwh_utama', 'halaman_meter_gi'] }}" data-tip="kWh Utama"><span>kWh Utama</span></a>
+            <a href="{{ url_for('halaman_kwh_pembanding') }}" class="sb-nav-item sb-subnav-item {{ 'active' if request.endpoint == 'halaman_kwh_pembanding' }}" data-tip="kWh Pembanding"><span>kWh Pembanding</span></a>
+            <a href="{{ url_for('halaman_psgi') }}" class="sb-nav-item sb-subnav-item {{ 'active' if request.endpoint == 'halaman_psgi' }}" data-tip="PSGI"><span>PSGI</span></a>
+            <a href="{{ url_for('halaman_deviasi') }}" class="sb-nav-item sb-subnav-item {{ 'active' if request.endpoint == 'halaman_deviasi' }}" data-tip="Deviasi"><span>Deviasi</span></a>
+          </div>
+        </div>
 
-        <a href="{{ url_for('halaman_penyulang') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_penyulang' }}" data-tip="kWh Penyulang">
-          <i class="ti ti-plug" aria-hidden="true"></i>
-          <span class="sb-nav-label">kWh Penyulang</span>
-        </a>
+        <div class="sb-nav-group {{ 'open' if request.endpoint in uid_group else '' }}" data-sidebar-group="uid">
+          <button class="sb-nav-parent {{ 'active' if request.endpoint in uid_group else '' }}" type="button" aria-expanded="{{ 'true' if request.endpoint in uid_group else 'false' }}" data-tip="UID">
+            <i class="ti ti-network" aria-hidden="true"></i>
+            <span class="sb-nav-label">UID</span>
+            <i class="ti ti-chevron-down sb-group-chevron" aria-hidden="true"></i>
+          </button>
+          <div class="sb-subnav">
+            <a href="{{ url_for('halaman_transfer_antar_uid') }}" class="sb-nav-item sb-subnav-item {{ 'active' if request.endpoint == 'halaman_transfer_antar_uid' }}" data-tip="Transfer Antar UID"><span>Transfer Antar UID</span></a>
+            <a href="{{ url_for('halaman_transfer') }}" class="sb-nav-item sb-subnav-item {{ 'active' if request.endpoint == 'halaman_transfer' }}" data-tip="Transfer EXIM"><span>Transfer EXIM</span></a>
+            <a href="{{ url_for('halaman_proporsional') }}" class="sb-nav-item sb-subnav-item {{ 'active' if request.endpoint == 'halaman_proporsional' }}" data-tip="Proporsional"><span>Proporsional</span></a>
+          </div>
+        </div>
 
-        <a href="{{ url_for('halaman_kwh_utama') }}" class="sb-nav-item {{ 'active' if request.endpoint in ['halaman_kwh_utama', 'halaman_meter_gi'] }}" data-tip="kWh Utama">
-          <i class="ti ti-bolt" aria-hidden="true"></i>
-          <span class="sb-nav-label">kWh Utama</span>
-        </a>
+        <div class="sb-nav-group {{ 'open' if request.endpoint in master_group else '' }}" data-sidebar-group="master">
+          <button class="sb-nav-parent {{ 'active' if request.endpoint in master_group else '' }}" type="button" aria-expanded="{{ 'true' if request.endpoint in master_group else 'false' }}" data-tip="Master">
+            <i class="ti ti-database" aria-hidden="true"></i>
+            <span class="sb-nav-label">Master</span>
+            <i class="ti ti-chevron-down sb-group-chevron" aria-hidden="true"></i>
+          </button>
+          <div class="sb-subnav">
+            <a href="{{ url_for('halaman_rekap') }}" class="sb-nav-item sb-subnav-item {{ 'active' if request.endpoint == 'halaman_rekap' }}" data-tip="Rekap kWh"><span>Rekap kWh</span></a>
+            {% if active_user and active_user.role in ['admin', 'operator'] %}
+              <a href="{{ url_for('halaman_master_data') }}" class="sb-nav-item sb-subnav-item {{ 'active' if request.endpoint == 'halaman_master_data' }}" data-tip="Master Data"><span>Master Data</span></a>
+            {% endif %}
+          </div>
+        </div>
 
-        <a href="{{ url_for('halaman_kwh_pembanding') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_kwh_pembanding' }}" data-tip="kWh Pembanding">
-          <i class="ti ti-gauge" aria-hidden="true"></i>
-          <span class="sb-nav-label">kWh Pembanding</span>
-        </a>
+        <div class="sb-nav-group {{ 'open' if request.endpoint in transaksi_group else '' }}" data-sidebar-group="transaksi">
+          <button class="sb-nav-parent {{ 'active' if request.endpoint in transaksi_group else '' }}" type="button" aria-expanded="{{ 'true' if request.endpoint in transaksi_group else 'false' }}" data-tip="Transaksi">
+            <i class="ti ti-receipt" aria-hidden="true"></i>
+            <span class="sb-nav-label">Transaksi</span>
+            <i class="ti ti-chevron-down sb-group-chevron" aria-hidden="true"></i>
+          </button>
+          <div class="sb-subnav">
+            <a href="{{ url_for('halaman_kwh_jual') }}" class="sb-nav-item sb-subnav-item {{ 'active' if request.endpoint == 'halaman_kwh_jual' }}" data-tip="kWh Jual"><span>kWh Jual</span></a>
+            <a href="{{ url_for('halaman_emin') }}" class="sb-nav-item sb-subnav-item {{ 'active' if request.endpoint == 'halaman_emin' }}" data-tip="EMIN"><span>EMIN</span></a>
+          </div>
+        </div>
 
-        <a href="{{ url_for('halaman_psgi') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_psgi' }}" data-tip="PSGI">
-          <i class="ti ti-building-factory-2" aria-hidden="true"></i>
-          <span class="sb-nav-label">PSGI</span>
-        </a>
-
-        <a href="{{ url_for('halaman_deviasi') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_deviasi' }}" data-tip="Analisis Deviasi">
-          <i class="ti ti-chart-bar" aria-hidden="true"></i>
-          <span class="sb-nav-label">Deviasi</span>
-        </a>
-
-        <span class="sb-nav-section">UID</span>
-
-        <a href="{{ url_for('halaman_transfer_antar_uid') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_transfer_antar_uid' }}" data-tip="Transfer Antar UID">
-          <i class="ti ti-arrows-transfer-up" aria-hidden="true"></i>
-          <span class="sb-nav-label">Transfer Antar UID</span>
-        </a>
-
-        <a href="{{ url_for('halaman_transfer') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_transfer' }}" data-tip="Transfer EXIM">
-          <i class="ti ti-arrows-exchange" aria-hidden="true"></i>
-          <span class="sb-nav-label">Transfer EXIM</span>
-        </a>
-
-        <a href="{{ url_for('halaman_proporsional') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_proporsional' }}" data-tip="Proporsional">
-          <i class="ti ti-percentage" aria-hidden="true"></i>
-          <span class="sb-nav-label">Proporsional</span>
-        </a>
-
-        <a href="{{ url_for('halaman_rekap') }}" class="sb-nav-item {{ 'active' if request.endpoint == 'halaman_rekap' }}" data-tip="Rekap kWh">
-          <i class="ti ti-report-analytics" aria-hidden="true"></i>
-          <span class="sb-nav-label">Rekap kWh</span>
-        </a>
-
-        <a href="{{ url_for('halaman_profile') }}" class="sb-nav-item {{ 'active' if request.endpoint in ['halaman_profile', 'halaman_upload', 'halaman_security'] }}" data-tip="Profile">
+        <a href="{{ url_for('halaman_profile') }}" class="sb-nav-item {{ 'active' if request.endpoint in profile_group }}" data-tip="Profile">
           <i class="ti ti-user-circle" aria-hidden="true"></i>
           <span class="sb-nav-label">Profile</span>
         </a>
@@ -186,6 +196,7 @@
   const themeIco = document.getElementById('theme-icon');
   const themeLbl = document.getElementById('theme-label');
   const desktop = window.matchMedia('(min-width: 821px)');
+  const sidebarGroups = Array.from(document.querySelectorAll('.sb-nav-group'));
 
   const getStore = key => { try { return localStorage.getItem(key); } catch (_) { return null; } };
   const setStore = (key, value) => { try { localStorage.setItem(key, value); } catch (_) {} };
@@ -202,6 +213,14 @@
     toggle.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
     // Pastikan tombol selalu bisa diklik — pointer-events tidak terblokir
     toggle.style.pointerEvents = 'auto';
+  }
+
+  function setSidebarGroup(group, open) {
+    sidebarGroups.forEach(item => {
+      const isOpen = item === group && open;
+      item.classList.toggle('open', isOpen);
+      item.querySelector('.sb-nav-parent')?.setAttribute('aria-expanded', String(isOpen));
+    });
   }
 
   function applyTheme(dark) {
@@ -224,6 +243,21 @@
       syncSidebar();
     });
   }
+
+  sidebarGroups.forEach(group => {
+    const button = group.querySelector('.sb-nav-parent');
+    if (!button) return;
+    button.addEventListener('click', function () {
+      const isCollapsed = desktop.matches && sidebar?.classList.contains('collapsed');
+      if (isCollapsed) {
+        setStore('sb-collapsed', '0');
+        syncSidebar();
+        setSidebarGroup(group, true);
+        return;
+      }
+      setSidebarGroup(group, !group.classList.contains('open'));
+    });
+  });
 
   if (themeBtn) {
     themeBtn.addEventListener('click', function () {
@@ -250,6 +284,41 @@
     }
   }
   loadSidebarStats();
+
+  function reportExportParams() {
+    const params = new URLSearchParams();
+    const yearValue =
+      document.getElementById('filter-deviasi-tahun')?.value ||
+      document.getElementById('filter-prop-tahun')?.value ||
+      document.getElementById('rekap-tahun')?.value ||
+      document.getElementById('uid-transfer-tahun')?.value ||
+      document.getElementById('tahun')?.value ||
+      String(new Date().getFullYear());
+    const monthValue =
+      document.getElementById('filter-deviasi-bulan')?.value ||
+      document.getElementById('filter-prop-bulan')?.value ||
+      '';
+    const giValue =
+      document.getElementById('filter-deviasi-gi')?.value ||
+      document.getElementById('filter-prop-gi')?.value ||
+      document.getElementById('rekap-gi')?.value ||
+      '';
+    if (yearValue) params.set('tahun', yearValue);
+    if (monthValue && !['all', 'semua'].includes(String(monthValue).toLowerCase())) params.set('month', monthValue);
+    if (giValue) params.set('gi_id', giValue);
+    return params;
+  }
+
+  document.querySelectorAll('[data-export-report]').forEach(button => {
+    button.addEventListener('click', function () {
+      const module = this.dataset.reportModule;
+      const format = this.dataset.reportFormat || 'xlsx';
+      if (!module) return;
+      const params = reportExportParams();
+      const qs = params.toString();
+      window.location.href = `/api/export/${encodeURIComponent(module)}.${encodeURIComponent(format)}${qs ? `?${qs}` : ''}`;
+    });
+  });
 
   window.showToast = function (msg, type = 'info', durationMs = 4000) {
     const container = document.getElementById('toast-container');

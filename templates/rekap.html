@@ -7,12 +7,142 @@
       <div class="page-eyebrow">{{ eyebrow }}</div>
       <h1 class="page-title">{{ judul }}</h1>
     </div>
+    {% if judul == 'Rekap kWh' %}
+    <div class="topbar-right">
+      <button class="btn-outline" data-export-report data-report-module="rekap_kwh" data-report-format="xlsx">
+        <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
+        Excel
+      </button>
+      <button class="btn-outline" data-export-report data-report-module="rekap_kwh" data-report-format="pdf">
+        <i class="ti ti-file-type-pdf" aria-hidden="true"></i>
+        PDF
+      </button>
+    </div>
+    {% endif %}
   </div>
 
+  {% if judul == 'Rekap kWh' %}
+  <section class="filter-panel" aria-label="Filter rekap kWh">
+    <label class="field">
+      <span>Gardu Induk</span>
+      <select id="rekap-gi"></select>
+    </label>
+    <label class="field">
+      <span>Tahun</span>
+      <select id="rekap-tahun"></select>
+    </label>
+    <button id="btn-refresh-rekap" class="primary-action">
+      <i class="ti ti-adjustments" aria-hidden="true"></i>
+      Terapkan
+    </button>
+  </section>
+
+  <div class="metric-grid rekap-metrics">
+    <div class="metric-card mc-blue">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Meter Utama</span>
+          <div class="mc-icon"><i class="ti ti-bolt" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="rekap-mu-total">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">total tahun berjalan</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-green">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Penyulang</span>
+          <div class="mc-icon"><i class="ti ti-plug" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="rekap-feeder-total">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">kWh keluar GI</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-amber">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Susut</span>
+          <div class="mc-icon"><i class="ti ti-chart-arrows" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="rekap-susut-total">-</div>
+        <div class="mc-meta"><span class="mc-meta-text" id="rekap-susut-pct">-</span></div>
+      </div>
+    </div>
+    <div class="metric-card mc-danger">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Deviasi</span>
+          <div class="mc-icon"><i class="ti ti-arrows-diff" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="rekap-deviasi-pct">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">MU vs penyulang</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Tren Susut</div>
+      </div>
+      <div class="chart-box chart-box-medium">
+        <canvas id="chart-rekap-susut"></canvas>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Komposisi Energi</div>
+      </div>
+      <div class="chart-box chart-box-medium">
+        <canvas id="chart-rekap-energy"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div class="panel-title">Detail Rekap</div>
+      <span class="badge badge-neutral" id="rekap-live">Memuat</span>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table rekap-table" id="table-rekap">
+        <thead>
+          <tr>
+            <th>Periode</th>
+            <th>Gardu Induk</th>
+            <th class="tr">MU</th>
+            <th class="tr">MP</th>
+            <th class="tr">Penyulang</th>
+            <th class="tr">Deviasi %</th>
+            <th class="tr">Susut</th>
+            <th class="tr">Susut %</th>
+            <th class="tr">Ekspor</th>
+            <th class="tr">Impor</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="10" class="empty-cell">Memuat rekap...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% else %}
   <div class="coming-soon-wrap">
     <div class="cs-icon"><i class="ti ti-{{ icon }}" aria-hidden="true"></i></div>
     <h2 class="cs-title">{{ judul }}</h2>
     <p class="cs-desc">{{ desc }}</p>
   </div>
+  {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if judul == 'Rekap kWh' %}
+<script src="{{ url_for('static', filename='js/rekap.js') }}"></script>
+{% endif %}
 {% endblock %}

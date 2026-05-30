@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}kWh Jual - Susut Energi{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="page-eyebrow">Transaksi</div>
+      <h1 class="page-title">kWh Jual</h1>
+    </div>
+    <div class="topbar-right">
+      <div class="filter-pill">
+        <span class="fp-label">GI</span>
+        <select id="kwhjual-gi" class="fp-select"></select>
+        <div class="fp-sep"></div>
+        <span class="fp-label">Bulan</span>
+        <input id="kwhjual-bulan" class="fp-select" type="month">
+        <button id="btn-refresh-kwhjual" class="fp-btn" title="Refresh">
+          <i class="ti ti-refresh" aria-hidden="true"></i>
+        </button>
+      </div>
+      <button id="btn-kwhjual-input" class="btn-outline">
+        <i class="ti ti-edit" aria-hidden="true"></i>
+        Input Data
+      </button>
+      <button id="btn-kwhjual-export" class="btn-outline">
+        <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
+        Export Excel
+      </button>
+    </div>
+  </div>
+
+  <div class="metric-grid kwhjual-summary">
+    <div class="metric-card mc-green">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">Total kWh Jual</span>
+          <div class="mc-icon"><i class="ti ti-receipt-2" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="kwhjual-total">-</div>
+        <div class="mc-meta"><span class="mc-meta-text">semua tegangan</span></div>
+        <div class="mc-spark"><canvas id="kwhjual-spk-total"></canvas></div>
+      </div>
+    </div>
+    <div class="metric-card mc-blue">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">TR</span>
+          <div class="mc-icon"><i class="ti ti-bolt" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="kwhjual-tr">-</div>
+        <div class="mc-meta"><span class="mc-meta-text" id="kwhjual-tr-pct">-</span></div>
+        <div class="mc-spark"><canvas id="kwhjual-spk-tr"></canvas></div>
+      </div>
+    </div>
+    <div class="metric-card mc-amber">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">TM</span>
+          <div class="mc-icon"><i class="ti ti-transformer" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="kwhjual-tm">-</div>
+        <div class="mc-meta"><span class="mc-meta-text" id="kwhjual-tm-pct">-</span></div>
+        <div class="mc-spark"><canvas id="kwhjual-spk-tm"></canvas></div>
+      </div>
+    </div>
+    <div class="metric-card mc-danger">
+      <div class="mc-stripe"></div>
+      <div class="mc-body">
+        <div class="mc-head">
+          <span class="mc-label">TT</span>
+          <div class="mc-icon"><i class="ti ti-tower" aria-hidden="true"></i></div>
+        </div>
+        <div class="mc-value" id="kwhjual-tt">-</div>
+        <div class="mc-meta"><span class="mc-meta-text" id="kwhjual-tt-pct">-</span></div>
+        <div class="mc-spark"><canvas id="kwhjual-spk-tt"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Proporsi Golongan</div>
+      </div>
+      <div class="chart-box chart-box-medium">
+        <canvas id="chart-kwhjual-donut"></canvas>
+      </div>
+      <div class="kwhjual-legend" id="kwhjual-legend"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">kWh per Golongan</div>
+      </div>
+      <div class="chart-box chart-box-medium">
+        <canvas id="chart-kwhjual-bar"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel panel-full">
+    <div class="panel-header">
+      <div class="panel-title">Detail Golongan Tarif</div>
+      <span class="badge badge-neutral" id="kwhjual-live">Memuat</span>
+    </div>
+    <div class="kwhjual-accordion" id="kwhjual-accordion"></div>
+  </section>
+</div>
+
+<div class="kwhjual-modal" id="kwhjual-modal" hidden>
+  <div class="kwhjual-modal-card panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Input kWh Jual</div>
+        <div class="panel-subtitle">Per sub-golongan tarif</div>
+      </div>
+      <button id="btn-kwhjual-close" class="fp-btn" type="button" aria-label="Tutup">
+        <i class="ti ti-x" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="kwhjual-form-toolbar">
+      <label class="field">
+        <span>Gardu Induk</span>
+        <select id="kwhjual-form-gi"></select>
+      </label>
+      <label class="field">
+        <span>Bulan</span>
+        <input id="kwhjual-form-bulan" type="month">
+      </label>
+      <button id="btn-kwhjual-autosum" class="btn-outline" type="button">
+        <i class="ti ti-calculator" aria-hidden="true"></i>
+        Hitung Otomatis
+      </button>
+    </div>
+    <div class="table-scroll kwhjual-form-scroll">
+      <table class="data-table kwhjual-form-table" id="kwhjual-form-table">
+        <thead>
+          <tr>
+            <th>Sub-golongan</th>
+            <th>Tegangan</th>
+            <th class="tr">kWh</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="kwhjual-modal-footer">
+      <span class="subtext" id="kwhjual-form-total">Total: 0</span>
+      <button id="btn-kwhjual-save" class="primary-action" type="button">
+        <i class="ti ti-device-floppy" aria-hidden="true"></i>
+        Simpan
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/kwh_jual.js') }}"></script>
+{% endblock %}
