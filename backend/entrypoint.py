@@ -1,20 +1,12 @@
 """Package-safe entry point for the Flask backend.
 
-The current monolithic app still resolves its local modules from the backend
-folder. This entry point makes that execution mode explicit and re-exports the
-same SQLAlchemy registry used by the Flask application.
+Run this module from the repository root with ``python -m backend.entrypoint``
+or expose ``backend.entrypoint:app`` through Gunicorn.
 """
 
 from __future__ import annotations
 
 import os
-import sys
-from pathlib import Path
-
-
-BACKEND_DIR = Path(__file__).resolve().parent
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
 
 from .app import (
     app,
