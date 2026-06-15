@@ -1,13 +1,16 @@
 import unittest
 
+from flask_migrate import upgrade
 from sqlalchemy import inspect
 
-from backend.entrypoint import app, db
+from backend.entrypoint import MIGRATIONS_DIR, app, db
 
 
 class BackendStartupTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        with app.app_context():
+            upgrade(directory=str(MIGRATIONS_DIR))
         cls.client = app.test_client()
 
     def test_testing_mode_uses_in_memory_sqlite(self):
@@ -18,10 +21,11 @@ class BackendStartupTest(unittest.TestCase):
             self.assertEqual(db.engine.url.get_backend_name(), "sqlite")
             self.assertEqual(db.engine.url.database, ":memory:")
 
-    def test_startup_creates_core_tables(self):
+    def test_migration_creates_core_tables(self):
         with app.app_context():
             table_names = set(inspect(db.engine).get_table_names())
 
+        self.assertIn("alembic_version", table_names)
         self.assertIn("gardu_induk", table_names)
         self.assertIn("meter_reading", table_names)
         self.assertIn("feeder_reading", table_names)

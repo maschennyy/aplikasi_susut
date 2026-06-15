@@ -17,8 +17,13 @@ from .app import (
     MeterReading,
     FeederReading,
     TransferAntarUnit,
+    migrate,
+    MIGRATIONS_DIR,
 )
 
+from .migration_tools import register_migration_commands
+
+register_migration_commands(app, db)
 
 __all__ = [
     "app",
@@ -29,6 +34,8 @@ __all__ = [
     "MeterReading",
     "FeederReading",
     "TransferAntarUnit",
+    "migrate",
+    "MIGRATIONS_DIR",
 ]
 
 

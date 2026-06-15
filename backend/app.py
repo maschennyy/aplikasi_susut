@@ -4,6 +4,7 @@ Flask berjalan sebagai REST API backend untuk frontend terpisah.
 """
 
 from flask import Flask, Response, abort, g, jsonify, request, send_file, session
+from flask_migrate import Migrate
 from config import Config
 from models import (db, GarduInduk, Trafo, Penyulang,
                     MeterReading, FeederReading,
@@ -18,6 +19,7 @@ from collections import defaultdict, deque
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from functools import wraps
+from pathlib import Path
 from werkzeug.utils import secure_filename
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -34,61 +36,14 @@ app.config.from_object(Config)
 Config.validate()
 app.permanent_session_lifetime = timedelta(hours=app.config.get('PERMANENT_SESSION_HOURS', 8))
 db.init_app(app)
-
-with app.app_context():
-    db.create_all()
-    inspector = inspect(db.engine)
-    table_columns = {
-        table: {col['name'] for col in inspector.get_columns(table)}
-        for table in inspector.get_table_names()
-    }
-    schema_additions = {
-        'penyulang': [
-            ('area_up3', 'VARCHAR(100)'),
-            ('ex_cabang', 'VARCHAR(50)'),
-            ('status', "VARCHAR(30) DEFAULT 'AKTIF'"),
-        ],
-        'feeder_reading': [
-            ('deviasi_persen', 'NUMERIC(8, 2)'),
-            ('anomaly_type', 'VARCHAR(30)'),
-            ('wbp_stand_awal', 'NUMERIC(15, 2)'),
-            ('wbp_stand_akhir', 'NUMERIC(15, 2)'),
-            ('wbp_faktor_kali', 'NUMERIC(10, 2)'),
-            ('lwbp1_stand_awal', 'NUMERIC(15, 2)'),
-            ('lwbp1_stand_akhir', 'NUMERIC(15, 2)'),
-            ('lwbp1_faktor_kali', 'NUMERIC(10, 2)'),
-            ('lwbp2_stand_awal', 'NUMERIC(15, 2)'),
-            ('lwbp2_stand_akhir', 'NUMERIC(15, 2)'),
-            ('lwbp2_faktor_kali', 'NUMERIC(10, 2)'),
-            ('manual_kwh_wbp', 'NUMERIC(15, 2)'),
-            ('manual_kwh_lwbp1', 'NUMERIC(15, 2)'),
-            ('manual_kwh_lwbp2', 'NUMERIC(15, 2)'),
-            ('source_format', 'VARCHAR(30)'),
-            ('source_sheet', 'VARCHAR(80)'),
-            ('source_row_start', 'INTEGER'),
-            ('source_row_end', 'INTEGER'),
-        ],
-    }
-    for table, columns in schema_additions.items():
-        existing = table_columns.get(table, set())
-        for column_name, ddl in columns:
-            if column_name not in existing:
-                db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {column_name} {ddl}'))
-    if User.query.count() == 0:
-        admin_username = os.getenv('ADMIN_USERNAME')
-        admin_password = os.getenv('ADMIN_PASSWORD')
-        if admin_username and admin_password:
-            admin = User(
-                username=admin_username.strip(),
-                nama_lengkap=os.getenv('ADMIN_NAME', 'Administrator'),
-                email=os.getenv('ADMIN_EMAIL'),
-                role='admin',
-                aktif=True,
-            )
-            admin.set_password(admin_password)
-            db.session.add(admin)
-    db.session.commit()
-
+MIGRATIONS_DIR = Path(__file__).resolve().parent / 'migrations'
+migrate = Migrate(
+    app,
+    db,
+    directory=str(MIGRATIONS_DIR),
+    compare_type=True,
+    render_as_batch=True,
+)
 
 # ════════════════════════════════════════════════
 # KONFIGURASI SECURITY, ROLE, DAN WORKFLOW
