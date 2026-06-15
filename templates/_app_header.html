@@ -1,0 +1,19 @@
+<header class="app-topbar" aria-label="Header aplikasi">
+  <div class="app-topbar-brand">
+    <span class="app-topbar-logo" aria-hidden="true"><i class="ti ti-bolt"></i></span>
+    <span>Aplikasi Monitoring Susut Energi</span>
+  </div>
+  <div class="app-topbar-actions">
+    <button class="topbar-icon-button" type="button" aria-label="Notifikasi" title="Notifikasi">
+      <i class="ti ti-bell" aria-hidden="true"></i>
+      <span class="notification-dot" aria-hidden="true"></span>
+    </button>
+    <div class="topbar-user" title="{{ active_user.display_name if active_user else 'User' }}">
+      <span class="topbar-user-avatar">{{ active_user.initials if active_user else 'US' }}</span>
+      <span class="topbar-user-copy">
+        <strong>{{ active_user.display_name if active_user else 'User' }}</strong>
+        <small>{{ active_user.role|title if active_user else 'Viewer' }}</small>
+      </span>
+    </div>
+  </div>
+</header>
