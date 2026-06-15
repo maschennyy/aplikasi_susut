@@ -5,6 +5,7 @@
 # --- Rahasia & konfigurasi lokal ---
 .env
 .env.local
+.env*.local
 *.env
 
 # --- Python bytecode ---
@@ -27,10 +28,19 @@ ENV/
 instance/
 
 # --- Build & distribusi ---
+node_modules/
+.next/
+out/
+coverage/
 dist/
 build/
 *.egg-info/
 .eggs/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # --- Editor & OS ---
 .DS_Store

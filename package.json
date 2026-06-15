@@ -1,9 +1,11 @@
 {
-  "name": "aplikasi-susut-frontend",
+  "name": "aplikasi-susut",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "backend": "python backend/app.py",
+    "backend:seed": "python backend/seed_data.py",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

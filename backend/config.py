@@ -1,8 +1,13 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Muat variabel dari file .env
-load_dotenv()
+BACKEND_DIR = Path(__file__).resolve().parent
+ROOT_DIR = BACKEND_DIR.parent
+
+# Muat variabel dari root/.env kalau masih ada, lalu backend/.env sebagai lokasi utama.
+load_dotenv(ROOT_DIR / '.env')
+load_dotenv(BACKEND_DIR / '.env', override=True)
 
 class Config:
     # Koneksi database — dibaca dari .env, bukan hardcoded
@@ -33,10 +38,10 @@ class Config:
         if not os.getenv('DATABASE_URL'):
             raise ValueError(
                 "DATABASE_URL tidak ditemukan. "
-                "Pastikan file .env sudah dibuat dan berisi DATABASE_URL."
+                "Pastikan file backend/.env sudah dibuat dan berisi DATABASE_URL."
             )
         if not os.getenv('SECRET_KEY'):
             raise ValueError(
                 "SECRET_KEY tidak ditemukan. "
-                "Tambahkan SECRET_KEY ke file .env kamu."
+                "Tambahkan SECRET_KEY ke file backend/.env kamu."
             )

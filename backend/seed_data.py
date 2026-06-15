@@ -1,7 +1,7 @@
 """
 seed_data.py — Isi data awal untuk testing
 Jalankan SEKALI setelah models.py baru diterapkan:
-  python seed_data.py
+  python backend/seed_data.py
 
 Script ini mengisi:
   - 2 Gardu Induk (TNG, SRP)
