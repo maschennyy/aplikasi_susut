@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "backend": "python -m backend.entrypoint",
     "backend:seed": "python -m backend.seed_data",
-    "backend:test": "python -m unittest discover -s backend/tests -v",
+    "backend:test": "python -m unittest discover -s backend/tests -t . -v",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

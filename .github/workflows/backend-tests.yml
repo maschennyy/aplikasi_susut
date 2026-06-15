@@ -1,0 +1,44 @@
+name: Backend tests
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - "config.py"
+      - "models.py"
+      - "nkwh_excel.py"
+      - "package.json"
+      - ".github/workflows/backend-tests.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "config.py"
+      - "models.py"
+      - "nkwh_excel.py"
+      - "package.json"
+      - ".github/workflows/backend-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Run backend tests
+        run: python -m unittest discover -s backend/tests -t . -v
