@@ -33,6 +33,26 @@ const ANOMALY_META: Record<string, { color: string; label: string; description: 
     label: "Pola Tidak Wajar",
     description: "Pola data membutuhkan pemeriksaan lanjutan.",
   },
+  DEVIASI_NORMAL: {
+    color: "green",
+    label: "Normal",
+    description: "Seluruh deviasi berada di bawah 1%.",
+  },
+  DEVIASI_WARNING: {
+    color: "gold",
+    label: "Warning",
+    description: "Terdapat deviasi antara 1% sampai 3%.",
+  },
+  DEVIASI_ALERT: {
+    color: "red",
+    label: "Alert",
+    description: "Terdapat deviasi di atas 3%.",
+  },
+  DATA_TIDAK_LENGKAP: {
+    color: "orange",
+    label: "Data Belum Lengkap",
+    description: "Salah satu sumber meter utama, meter pembanding, atau penyulang belum tersedia.",
+  },
 };
 
 function fallbackLabel(flag: string) {
