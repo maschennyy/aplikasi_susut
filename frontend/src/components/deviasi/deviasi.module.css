@@ -1,0 +1,261 @@
+.pageStack {
+  display: grid;
+  gap: 20px;
+}
+
+.pageToolbar {
+  display: flex;
+  min-height: 64px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pageToolbar h2 {
+  margin: 0 !important;
+  color: var(--app-foreground) !important;
+  font-size: 24px !important;
+  font-weight: 760 !important;
+  line-height: 1.2 !important;
+}
+
+.toolbarMeta {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted) !important;
+}
+
+.toolbarActions,
+.filterRow,
+.statusCounts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toolbarActions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.filterRow {
+  justify-content: space-between;
+}
+
+.panelCard {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: var(--shadow-panel);
+}
+
+.panelCard :global(.ant-card-body) {
+  padding: 18px;
+}
+
+.resetFilterButton {
+  color: #64748b;
+}
+
+.resetFilterButton:hover {
+  color: #be123c !important;
+  background: #fff1f2 !important;
+}
+
+.tableWrap {
+  display: grid;
+  gap: 12px;
+}
+
+.tableSkeleton {
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.primaryCell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.primaryCell strong {
+  color: var(--app-foreground);
+  font-weight: 720;
+}
+
+.monoCell,
+.percentNormal,
+.percentWarning,
+.percentAlert {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.percentNormal,
+.percentWarning,
+.percentAlert {
+  display: inline-flex;
+  min-width: 78px;
+  justify-content: flex-end;
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-weight: 720;
+}
+
+.percentNormal {
+  color: #087443;
+  background: #e9f9f0;
+}
+
+.percentWarning {
+  color: #9a6700;
+  background: #fff7d6;
+}
+
+.percentAlert {
+  color: #b42318;
+  background: #fff0ee;
+}
+
+.missingText {
+  max-width: 185px;
+  color: #9a6700 !important;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.warningRow :global(td) {
+  background: #fffbeb !important;
+}
+
+.alertRow :global(td) {
+  background: #fff5f5 !important;
+}
+
+.incompleteRow :global(td) {
+  background: #fff9e8 !important;
+}
+
+.summaryHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.summaryHeader h4 {
+  margin: 0 0 3px !important;
+}
+
+.statusCounts {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.statusCounts span {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 5px 9px;
+  color: #52637a;
+  background: #f6f9fd;
+  font-size: 12px;
+}
+
+.statusCounts strong {
+  color: var(--app-foreground);
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summaryGrid > div {
+  min-width: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.summaryGrid :global(.ant-statistic-title) {
+  min-height: 40px;
+  color: #64748b;
+}
+
+.summaryGrid :global(.ant-statistic-content) {
+  font-size: 20px;
+}
+
+.summaryGrid :global(.ant-statistic-content-value) {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.summaryNormal {
+  border-color: #a7e7c4 !important;
+  background: #f0fbf5 !important;
+}
+
+.summaryWarning {
+  border-color: #f1d27a !important;
+  background: #fffbeb !important;
+}
+
+.summaryAlert {
+  border-color: #f5b5ae !important;
+  background: #fff5f5 !important;
+}
+
+.summaryNormal > span,
+.summaryWarning > span,
+.summaryAlert > span {
+  display: block;
+  margin-top: 5px;
+  font-weight: 750;
+}
+
+.summaryNormal > span {
+  color: #087443;
+}
+
+.summaryWarning > span {
+  color: #9a6700;
+}
+
+.summaryAlert > span {
+  color: #b42318;
+}
+
+@media (max-width: 1279px) {
+  .pageToolbar,
+  .filterRow,
+  .summaryHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .toolbarActions,
+  .statusCounts {
+    justify-content: flex-start;
+  }
+
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
+}
