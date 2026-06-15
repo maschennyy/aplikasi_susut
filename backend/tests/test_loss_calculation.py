@@ -1,7 +1,7 @@
 import unittest
 from decimal import Decimal
 
-from services.loss_calculation import (
+from backend.services.loss_calculation import (
     LossCalculationInput,
     calculate_cumulative_loss_without_emin,
     calculate_monthly_loss_without_emin,
@@ -18,9 +18,7 @@ class LossCalculationTest(unittest.TestCase):
             kwh_jual=292_999_963,
             emin=4_971_114,
         )
-
         result = calculate_monthly_loss_without_emin(data)
-
         self.assertEqual(result.kwh_produksi, Decimal("383504068"))
         self.assertEqual(result.kwh_terima_netto, Decimal("328184767"))
         self.assertEqual(result.kwh_siap_jual, Decimal("325746328"))
@@ -31,30 +29,14 @@ class LossCalculationTest(unittest.TestCase):
         )
 
     def test_emin_is_added_back_for_without_emin_loss(self):
-        data = LossCalculationInput.create(
-            kwh_utama=1000,
-            kwh_jual=800,
-            emin=50,
-        )
-
+        data = LossCalculationInput.create(kwh_utama=1000, kwh_jual=800, emin=50)
         result = calculate_monthly_loss_without_emin(data)
-
         self.assertEqual(result.susut_tanpa_emin_kwh, Decimal("250"))
 
     def test_cumulative_uses_accumulated_kwh_not_average_percentage(self):
-        january = LossCalculationInput.create(
-            kwh_utama=1000,
-            kwh_jual=800,
-            emin=50,
-        )
-        february = LossCalculationInput.create(
-            kwh_utama=2000,
-            kwh_jual=1900,
-            emin=20,
-        )
-
+        january = LossCalculationInput.create(kwh_utama=1000, kwh_jual=800, emin=50)
+        february = LossCalculationInput.create(kwh_utama=2000, kwh_jual=1900, emin=20)
         result = calculate_cumulative_loss_without_emin([january, february])
-
         self.assertEqual(result.kwh_produksi, Decimal("3000"))
         self.assertEqual(result.kwh_jual, Decimal("2700"))
         self.assertEqual(result.emin, Decimal("70"))
