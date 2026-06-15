@@ -91,17 +91,64 @@ Database PostgreSQL pada `DATABASE_URL` tidak digunakan selama test. Suite test 
 - endpoint CSRF dan security headers;
 - endpoint sidebar stats;
 - identitas package/import backend;
-- rumus susut bulanan dan kumulatif tanpa EMIN.
+- rumus susut bulanan dan kumulatif tanpa EMIN;
+- guardrail seed development.
 
 GitHub Actions menjalankan suite yang sama secara otomatis ketika file backend terkait berubah pada push atau pull request.
 
 ## Seed Data Development
 
+Seed menghapus data transaksi, master GI, trafo, penyulang, dan data EXIM terkait sebelum mengisi data contoh. Seed hanya boleh digunakan pada database development lokal.
+
+Pastikan migrasi sudah dijalankan:
+
+```bash
+npm run backend:db:upgrade
+```
+
+Pada `backend/.env`, gunakan database lokal lalu aktifkan izin destruktif:
+
+```env
+APP_ENV=development
+DATABASE_URL=postgresql://USERNAME:PASSWORD@localhost:5432/NAMA_DB_DEVELOPMENT
+ALLOW_DESTRUCTIVE_SEED=true
+```
+
+Jalankan:
+
 ```bash
 npm run backend:seed
 ```
 
-Seed menghapus sejumlah tabel sebelum mengisi data contoh. Jangan jalankan perintah ini pada database operasional.
+Perintah akan menampilkan target database dan meminta Anda mengetik persis:
+
+```text
+RESET DATABASE LOKAL
+```
+
+Seed otomatis ditolak ketika:
+
+- `APP_ENV` bukan `development`;
+- `ALLOW_DESTRUCTIVE_SEED` tidak aktif;
+- database PostgreSQL/MySQL mengarah ke host selain `localhost`, `127.0.0.1`, atau `::1`;
+- SQLite menggunakan database in-memory;
+- tabel hasil migrasi belum tersedia;
+- teks konfirmasi tidak cocok.
+
+Untuk penggunaan non-interaktif pada database development lokal, kedua syarat berikut wajib dipenuhi:
+
+```env
+ALLOW_DESTRUCTIVE_SEED=true
+SEED_CONFIRMATION=RESET_LOCAL_DEVELOPMENT_DATABASE
+```
+
+Lalu jalankan:
+
+```bash
+python -m backend.seed_data --yes
+```
+
+Jangan menyimpan dua variabel izin tersebut pada environment server bersama atau production.
 
 ## Menjalankan dengan Gunicorn
 
@@ -138,7 +185,6 @@ Build production akan dihentikan ketika `FLASK_API_BASE_URL` kosong atau tidak v
 ```bash
 pip install -r backend/requirements.txt
 ```
-
 
 ## Migrasi Database
 
