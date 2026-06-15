@@ -1,7 +1,7 @@
 """
 seed_data.py — Isi data awal untuk testing
 Jalankan SEKALI setelah models.py baru diterapkan:
-  python backend/seed_data.py
+  python -m backend.seed_data
 
 Script ini mengisi:
   - 2 Gardu Induk (TNG, SRP)
@@ -11,10 +11,19 @@ Script ini mengisi:
   - Data feeder readings Mei 2025
 """
 
-from app import app, db
-from models import (GarduInduk, Trafo, Penyulang,
-                    MeterReading, FeederReading, TransferAntarUnit)
 from datetime import date
+
+from .entrypoint import app
+from .models import (
+    db,
+    GarduInduk,
+    Trafo,
+    Penyulang,
+    MeterReading,
+    FeederReading,
+    TransferAntarUnit,
+)
+
 
 def seed():
     with app.app_context():
@@ -121,12 +130,13 @@ def seed():
 
         db.session.commit()
         print("\n✓ Seed data berhasil dibuat!")
-        print(f"  GarduInduk : 2 data")
-        print(f"  Trafo      : 3 data")
-        print(f"  Penyulang  : 6 data")
-        print(f"  MeterReading  : 1 data (Mei 2025)")
-        print(f"  FeederReading : 6 data (Mei 2025)")
-        print(f"  Transfer      : 2 data (Mei 2025)")
+        print("  GarduInduk : 2 data")
+        print("  Trafo      : 3 data")
+        print("  Penyulang  : 6 data")
+        print("  MeterReading  : 1 data (Mei 2025)")
+        print("  FeederReading : 6 data (Mei 2025)")
+        print("  Transfer      : 2 data (Mei 2025)")
+
 
 if __name__ == '__main__':
     seed()
