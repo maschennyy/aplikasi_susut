@@ -1,14 +1,19 @@
 "use client";
 
-import { Alert, Card, Empty, Skeleton, Table, Tag, Typography } from "antd";
+import { Card, Skeleton, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { CalendarClock, RefreshCw } from "lucide-react";
 import type { DeviasiGiRow, ExecutiveDashboardData, ResourceState } from "@/hooks/useDashboardData";
+import { EmptyState } from "@/components/shared/EmptyState";
 import styles from "./dashboard.module.css";
 
 const { Text, Title } = Typography;
 
 type DeviasiTableProps = {
   resource: ResourceState<ExecutiveDashboardData>;
+  selectedPeriodLabel: string;
+  onPreviousPeriod: () => void;
+  onRetry: () => void;
 };
 
 const statusMap: Record<DeviasiGiRow["status"], { color: string; label: string }> = {
@@ -69,7 +74,7 @@ const columns: ColumnsType<DeviasiGiRow> = [
   },
 ];
 
-export function DeviasiTable({ resource }: DeviasiTableProps) {
+export function DeviasiTable({ resource, selectedPeriodLabel, onPreviousPeriod, onRetry }: DeviasiTableProps) {
   return (
     <Card className={styles.panelCard} variant="borderless">
       <div className={styles.panelHeader}>
@@ -80,11 +85,23 @@ export function DeviasiTable({ resource }: DeviasiTableProps) {
       </div>
 
       {resource.error ? (
-        <Alert message="Tabel deviasi tidak dapat dimuat" description={resource.error} showIcon type="warning" />
+        <EmptyState
+          actionLabel="Coba Lagi"
+          description="Terjadi kesalahan saat mengambil data. Periksa koneksi atau coba muat ulang."
+          icon={RefreshCw}
+          title="Gagal memuat data"
+          onAction={onRetry}
+        />
       ) : resource.isLoading || !resource.data ? (
         <Skeleton active paragraph={{ rows: 8 }} />
       ) : resource.data.deviasiGi.length === 0 ? (
-        <Empty description="Belum ada deviasi GI untuk periode ini" />
+        <EmptyState
+          actionLabel="Lihat Bulan Sebelumnya"
+          description={`Data untuk periode ${selectedPeriodLabel} belum tersedia. Pastikan data sudah diinput atau coba bulan sebelumnya.`}
+          icon={CalendarClock}
+          title="Belum ada data bulan ini"
+          onAction={onPreviousPeriod}
+        />
       ) : (
         <Table<DeviasiGiRow>
           columns={columns}

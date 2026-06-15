@@ -46,18 +46,18 @@ export function Sidebar({ collapsed, giAktif, statsLoading, userRole, onCollapse
   return (
     <Sider
       breakpoint="lg"
-      className={styles.sidebar}
+      className={`${styles.sidebar} ${collapsed ? styles.sidebarCollapsed : styles.sidebarExpanded}`}
       collapsed={collapsed}
-      collapsedWidth={76}
+      collapsedWidth={64}
       collapsible
       theme="light"
       trigger={null}
-      width={284}
+      width={220}
       onBreakpoint={(broken) => onCollapseChange(broken)}
     >
       <div className={styles.sidebarInner}>
         <div className={styles.brandArea}>
-          <Link className={styles.brandLink} href="/" aria-label="Dashboard Aplikasi Monitoring Susut Energi">
+          <Link className={styles.brandLink} href="/dashboard" aria-label="Dashboard Aplikasi Monitoring Susut Energi">
             <span className={styles.brandMark}>
               <Zap aria-hidden="true" size={22} strokeWidth={2.25} />
             </span>

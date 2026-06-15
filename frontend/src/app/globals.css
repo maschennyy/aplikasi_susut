@@ -1,11 +1,11 @@
 :root {
   color-scheme: light;
-  --app-background: #f4f7fb;
+  --app-background: #f8f9fa;
   --app-foreground: #102033;
   --surface: #ffffff;
   --surface-subtle: #f8fafc;
   --surface-raised: rgba(255, 255, 255, 0.88);
-  --border-soft: #d9e3ef;
+  --border-soft: #e5e7eb;
   --text-muted: #64748b;
   --pln-navy: #073b86;
   --pln-blue: #0b63ce;

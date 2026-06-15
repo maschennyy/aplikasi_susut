@@ -1,0 +1,38 @@
+.emptyState {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 32px 18px;
+  text-align: center;
+}
+
+.iconWrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  color: #9ca3af;
+  background: #f3f4f6;
+}
+
+.title {
+  margin: 2px 0 0;
+  color: var(--app-foreground);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.description {
+  max-width: 360px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.action {
+  margin-top: 4px;
+}

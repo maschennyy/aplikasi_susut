@@ -1,13 +1,16 @@
 "use client";
 
-import { Alert, Card, Skeleton, Tooltip, Typography } from "antd";
+import { Card, Skeleton, Tooltip, Typography } from "antd";
+import { RefreshCw } from "lucide-react";
 import type { ResourceState, WorkflowMonth } from "@/hooks/useDashboardData";
+import { EmptyState } from "@/components/shared/EmptyState";
 import styles from "./dashboard.module.css";
 
 const { Text, Title } = Typography;
 
 type WorkflowStripProps = {
   resource: ResourceState<WorkflowMonth[]>;
+  onRetry: () => void;
 };
 
 const workflowLabel: Record<WorkflowMonth["status"], string> = {
@@ -17,7 +20,7 @@ const workflowLabel: Record<WorkflowMonth["status"], string> = {
   locked: "Locked",
 };
 
-export function WorkflowStrip({ resource }: WorkflowStripProps) {
+export function WorkflowStrip({ resource, onRetry }: WorkflowStripProps) {
   return (
     <Card className={styles.panelCard} variant="borderless">
       <div className={styles.panelHeader}>
@@ -28,7 +31,13 @@ export function WorkflowStrip({ resource }: WorkflowStripProps) {
       </div>
 
       {resource.error ? (
-        <Alert message="Workflow tidak dapat dimuat" description={resource.error} showIcon type="warning" />
+        <EmptyState
+          actionLabel="Coba Lagi"
+          description="Terjadi kesalahan saat mengambil data. Periksa koneksi atau coba muat ulang."
+          icon={RefreshCw}
+          title="Gagal memuat data"
+          onAction={onRetry}
+        />
       ) : resource.isLoading || !resource.data ? (
         <div className={styles.workflowGrid}>
           {Array.from({ length: 12 }, (_, index) => (

@@ -1,6 +1,7 @@
 "use client";
 
-import { Alert, Card, Empty, Skeleton, Typography } from "antd";
+import { Card, Skeleton, Typography } from "antd";
+import { CalendarClock, RefreshCw } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -11,19 +12,23 @@ import {
   YAxis,
 } from "recharts";
 import type { DashboardData, ResourceState } from "@/hooks/useDashboardData";
+import { EmptyState } from "@/components/shared/EmptyState";
 import styles from "./dashboard.module.css";
 
 const { Text, Title } = Typography;
 
 type SusutChartProps = {
   resource: ResourceState<DashboardData>;
+  selectedPeriodLabel: string;
+  onPreviousPeriod: () => void;
+  onRetry: () => void;
 };
 
 function formatPercent(value: number) {
   return `${value.toFixed(2)}%`;
 }
 
-export function SusutChart({ resource }: SusutChartProps) {
+export function SusutChart({ resource, selectedPeriodLabel, onPreviousPeriod, onRetry }: SusutChartProps) {
   return (
     <Card className={styles.panelCard} variant="borderless">
       <div className={styles.panelHeader}>
@@ -34,11 +39,23 @@ export function SusutChart({ resource }: SusutChartProps) {
       </div>
 
       {resource.error ? (
-        <Alert message="Grafik susut tidak dapat dimuat" description={resource.error} showIcon type="warning" />
+        <EmptyState
+          actionLabel="Coba Lagi"
+          description="Terjadi kesalahan saat mengambil data. Periksa koneksi atau coba muat ulang."
+          icon={RefreshCw}
+          title="Gagal memuat data"
+          onAction={onRetry}
+        />
       ) : resource.isLoading || !resource.data ? (
         <Skeleton active paragraph={{ rows: 8 }} />
       ) : resource.data.monthlyData.length === 0 ? (
-        <Empty description="Belum ada data susut untuk periode ini" />
+        <EmptyState
+          actionLabel="Lihat Bulan Sebelumnya"
+          description={`Data untuk periode ${selectedPeriodLabel} belum tersedia. Pastikan data sudah diinput atau coba bulan sebelumnya.`}
+          icon={CalendarClock}
+          title="Belum ada data bulan ini"
+          onAction={onPreviousPeriod}
+        />
       ) : (
         <div className={styles.chartFrame}>
           <ResponsiveContainer height={300} width="100%">

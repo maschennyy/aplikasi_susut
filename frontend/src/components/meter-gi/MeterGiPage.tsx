@@ -1,14 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import dayjs from "dayjs";
 import { Alert, Button, Card, DatePicker, Segmented, Space, Typography } from "antd";
-import { Gauge, RefreshCw } from "lucide-react";
+import { FilterX, Gauge, RefreshCw } from "lucide-react";
 import { MeterTable } from "@/components/meter-gi/MeterTable";
 import styles from "@/components/meter-gi/meter-gi.module.css";
+import { ActiveFilterChips, type ActiveFilterChip } from "@/components/shared/ActiveFilterChips";
 import { CascadeFilter } from "@/components/shared/CascadeFilter";
 import { ExportButton } from "@/components/shared/ExportButton";
-import { useMeterData, type MeterMode } from "@/hooks/useMeterData";
+import { currentMeterPeriod, useMeterData, type MeterMode } from "@/hooks/useMeterData";
+import { formatPeriodLabel, previousPeriod } from "@/lib/period";
 
 const { Text, Title } = Typography;
 
@@ -33,20 +35,85 @@ function modeLabel(mode: MeterMode) {
 }
 
 export function MeterGiPage({ mode }: MeterGiPageProps) {
-  const meter = useMeterData(mode);
-  const periodValue = useMemo(() => dayjs(meter.filters.periode, "YYYYMM"), [meter.filters.periode]);
-  const metadata = meter.meter.data.metadata;
-  const isBusy = meter.master.isLoading || meter.meter.isLoading;
+  const {
+    filters,
+    master,
+    meter,
+    filteredTrafo,
+    setFilters,
+    refreshMaster,
+    refreshMeters,
+  } = useMeterData(mode);
+  const defaultPeriod = currentMeterPeriod();
+  const periodValue = useMemo(() => dayjs(filters.periode, "YYYYMM"), [filters.periode]);
+  const selectedPeriodLabel = useMemo(() => formatPeriodLabel(filters.periode), [filters.periode]);
+  const metadata = meter.data.metadata;
+  const isBusy = master.isLoading || meter.isLoading;
+  const selectedGi = useMemo(
+    () => master.data.garduInduk.find((gi) => gi.id === filters.giId) ?? null,
+    [filters.giId, master.data.garduInduk],
+  );
+  const selectedTrafo = useMemo(
+    () => master.data.trafo.find((trafo) => trafo.id === filters.trafoId) ?? null,
+    [filters.trafoId, master.data.trafo],
+  );
+  const hasEntityFilters = Boolean(filters.giId || filters.trafoId);
+  const hasActiveFilters = hasEntityFilters || filters.periode !== defaultPeriod;
+
+  const handleResetFilters = useCallback(() => {
+    setFilters({
+      giId: null,
+      trafoId: null,
+      periode: defaultPeriod,
+    });
+  }, [defaultPeriod, setFilters]);
+
+  const handlePreviousPeriod = useCallback(() => {
+    setFilters({ periode: previousPeriod(filters.periode) });
+  }, [filters.periode, setFilters]);
+
+  const activeFilters = useMemo<ActiveFilterChip[]>(() => {
+    const chips: ActiveFilterChip[] = [];
+
+    if (selectedGi) {
+      chips.push({
+        key: "gi",
+        label: "GI",
+        value: `${selectedGi.kode} - ${selectedGi.nama}`,
+        onClear: () => setFilters({ giId: null, trafoId: null }),
+      });
+    }
+
+    if (selectedTrafo) {
+      chips.push({
+        key: "trafo",
+        label: "Trafo",
+        value: `${selectedTrafo.kode} - ${selectedTrafo.nama}`,
+        onClear: () => setFilters({ trafoId: null }),
+      });
+    }
+
+    if (filters.periode !== defaultPeriod) {
+      chips.push({
+        key: "periode",
+        label: "Periode",
+        value: selectedPeriodLabel,
+        onClear: () => setFilters({ periode: defaultPeriod }),
+      });
+    }
+
+    return chips;
+  }, [defaultPeriod, filters.periode, selectedGi, selectedPeriodLabel, selectedTrafo, setFilters]);
 
   const exportParams = useMemo(
     () => ({
-      gi_id: meter.filters.giId,
-      trafo_id: meter.filters.trafoId,
-      periode: meter.filters.periode,
-      bulan: monthParam(meter.filters.periode),
+      gi_id: filters.giId,
+      trafo_id: filters.trafoId,
+      periode: filters.periode,
+      bulan: monthParam(filters.periode),
       mode,
     }),
-    [meter.filters, mode],
+    [filters, mode],
   );
 
   const exportModule = mode === "utama" ? "meter-utama" : "meter-pembanding";
@@ -65,7 +132,7 @@ export function MeterGiPage({ mode }: MeterGiPageProps) {
           <span className={styles.modeBadge}>{mode === "utama" ? "Meter Utama" : "Meter Pembanding"}</span>
           <ExportButton
             endpoint={`/export/${exportModule}.xlsx`}
-            filename={`${exportModule}-${meter.filters.periode}.xlsx`}
+            filename={`${exportModule}-${filters.periode}.xlsx`}
             params={exportParams}
           />
         </div>
@@ -75,12 +142,12 @@ export function MeterGiPage({ mode }: MeterGiPageProps) {
         <div className={styles.filterRow}>
           <Space wrap size={10}>
             <CascadeFilter
-              garduInduk={meter.master.data.garduInduk}
-              giId={meter.filters.giId}
-              loading={meter.master.isLoading}
-              trafo={meter.filteredTrafo}
-              trafoId={meter.filters.trafoId}
-              onChange={({ giId, trafoId }) => meter.setFilters({ giId, trafoId })}
+              garduInduk={master.data.garduInduk}
+              giId={filters.giId}
+              loading={master.isLoading}
+              trafo={filteredTrafo}
+              trafoId={filters.trafoId}
+              onChange={({ giId, trafoId }) => setFilters({ giId, trafoId })}
             />
 
             <DatePicker
@@ -89,7 +156,7 @@ export function MeterGiPage({ mode }: MeterGiPageProps) {
               picker="month"
               value={periodValue}
               onChange={(value) => {
-                if (value) meter.setFilters({ periode: value.format("YYYYMM") });
+                if (value) setFilters({ periode: value.format("YYYYMM") });
               }}
             />
 
@@ -107,17 +174,30 @@ export function MeterGiPage({ mode }: MeterGiPageProps) {
             icon={<RefreshCw aria-hidden="true" size={16} />}
             loading={isBusy}
             onClick={() => {
-              void Promise.all([meter.refreshMaster(), meter.refreshMeters()]);
+              void Promise.all([refreshMaster(), refreshMeters()]);
             }}
           >
             Refresh
           </Button>
+          {hasActiveFilters ? (
+            <Button
+              className={styles.resetFilterButton}
+              icon={<FilterX aria-hidden="true" size={15} />}
+              size="small"
+              type="text"
+              onClick={handleResetFilters}
+            >
+              Reset Filter
+            </Button>
+          ) : null}
         </div>
 
-        {meter.master.error ? (
+        <ActiveFilterChips filters={activeFilters} onResetAll={handleResetFilters} />
+
+        {master.error ? (
           <Alert
             className={styles.tableWrap}
-            description={meter.master.error}
+            description={master.error}
             message="Data master tidak bisa dimuat"
             showIcon
             type="warning"
@@ -148,12 +228,16 @@ export function MeterGiPage({ mode }: MeterGiPageProps) {
 
       <Card className={styles.panelCard} variant="borderless">
         <MeterTable
-          error={meter.meter.error}
-          loading={meter.meter.isLoading}
+          error={meter.error}
+          hasEntityFilters={hasEntityFilters}
+          loading={meter.isLoading}
           metadata={metadata}
           mode={mode}
-          rows={meter.meter.data.meters}
-          onRefresh={meter.refreshMeters}
+          rows={meter.data.meters}
+          selectedPeriodLabel={selectedPeriodLabel}
+          onPreviousPeriod={handlePreviousPeriod}
+          onRefresh={refreshMeters}
+          onResetFilters={handleResetFilters}
         />
       </Card>
     </div>

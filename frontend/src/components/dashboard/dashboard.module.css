@@ -28,14 +28,16 @@
 .toolbarActions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 10px;
 }
 
 .kpiCard,
 .panelCard {
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
   box-shadow: var(--shadow-panel);
 }
 
@@ -61,6 +63,15 @@
 
 .panelCard :global(.ant-card-body) {
   padding: 20px;
+}
+
+.resetFilterButton {
+  color: #64748b;
+}
+
+.resetFilterButton:hover {
+  color: #be123c !important;
+  background: #fff1f2 !important;
 }
 
 .kpiHeader,

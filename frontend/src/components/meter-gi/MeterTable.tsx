@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { Alert, Button, Descriptions, Empty, Skeleton, Space, Table, Typography } from "antd";
+import { Descriptions, Skeleton, Space, Table, Typography } from "antd";
 import type { TableColumnsType } from "antd";
-import { RefreshCw } from "lucide-react";
+import { CalendarClock, FilterX, RefreshCw } from "lucide-react";
 import { AnomalyBadge } from "@/components/penyulang/AnomalyBadge";
+import { EmptyState } from "@/components/shared/EmptyState";
 import type { MeterMetadata, MeterMode, MeterRow } from "@/hooks/useMeterData";
 import styles from "./meter-gi.module.css";
 
@@ -16,7 +17,11 @@ type MeterTableProps = {
   mode: MeterMode;
   loading: boolean;
   error: string | null;
+  hasEntityFilters: boolean;
+  selectedPeriodLabel: string;
+  onPreviousPeriod: () => void;
   onRefresh: () => Promise<void>;
+  onResetFilters: () => void;
 };
 
 const NUMBER_FORMATTER = new Intl.NumberFormat("id-ID", {
@@ -34,7 +39,18 @@ function compactValue(value: unknown) {
   return String(value);
 }
 
-export function MeterTable({ rows, metadata, mode, loading, error, onRefresh }: MeterTableProps) {
+export function MeterTable({
+  rows,
+  metadata,
+  mode,
+  loading,
+  error,
+  hasEntityFilters,
+  selectedPeriodLabel,
+  onPreviousPeriod,
+  onRefresh,
+  onResetFilters,
+}: MeterTableProps) {
   const columns = useMemo<TableColumnsType<MeterRow>>(
     () => [
       {
@@ -133,19 +149,33 @@ export function MeterTable({ rows, metadata, mode, loading, error, onRefresh }: 
 
   if (error) {
     return (
-      <Alert
-        action={
-          <Button icon={<RefreshCw aria-hidden="true" size={15} />} size="small" onClick={() => void onRefresh()}>
-            Coba Lagi
-          </Button>
-        }
-        description={error}
-        message="Data Meter GI tidak bisa dimuat"
-        showIcon
-        type="error"
+      <EmptyState
+        actionLabel="Coba Lagi"
+        description="Terjadi kesalahan saat mengambil data. Periksa koneksi atau coba muat ulang."
+        icon={RefreshCw}
+        title="Gagal memuat data"
+        onAction={() => void onRefresh()}
       />
     );
   }
+
+  const emptyText = hasEntityFilters ? (
+    <EmptyState
+      actionLabel="Reset Filter"
+      description="Tidak ada meter GI yang cocok dengan filter yang dipilih. Coba ubah Gardu Induk, Trafo, atau periode."
+      icon={FilterX}
+      title="Tidak ada data ditemukan"
+      onAction={onResetFilters}
+    />
+  ) : (
+    <EmptyState
+      actionLabel="Lihat Bulan Sebelumnya"
+      description={`Data untuk periode ${selectedPeriodLabel} belum tersedia. Pastikan data sudah diinput atau coba bulan sebelumnya.`}
+      icon={CalendarClock}
+      title="Belum ada data bulan ini"
+      onAction={onPreviousPeriod}
+    />
+  );
 
   return (
     <div className={styles.tableWrap}>
@@ -164,12 +194,7 @@ export function MeterTable({ rows, metadata, mode, loading, error, onRefresh }: 
           ),
         }}
         locale={{
-          emptyText: (
-            <Empty
-              description={`Belum ada data kWh ${mode === "utama" ? "utama" : "pembanding"} untuk filter ini`}
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-            />
-          ),
+          emptyText,
         }}
         loading={loading}
         pagination={{
@@ -186,7 +211,7 @@ export function MeterTable({ rows, metadata, mode, loading, error, onRefresh }: 
           <Table.Summary fixed>
             <Table.Summary.Row>
               <Table.Summary.Cell index={0} colSpan={3}>
-                <strong>Summary</strong>
+                <strong>Summary {mode === "utama" ? "Meter Utama" : "Meter Pembanding"}</strong>
               </Table.Summary.Cell>
               <Table.Summary.Cell align="right" index={3}>
                 <span className={styles.summaryCell}>{formatNumber(metadata.totalKwhImport)}</span>

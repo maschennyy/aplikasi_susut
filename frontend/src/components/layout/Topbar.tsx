@@ -1,36 +1,27 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
 import { App, Avatar, Badge, Button, Dropdown, Layout, Space, Tooltip, Typography } from "antd";
 import type { MenuProps } from "antd";
 import {
   Bell,
   ChevronDown,
   LogOut,
-  Menu as MenuIcon,
-  PanelLeftClose,
-  PanelLeftOpen,
-  RefreshCw,
   User as UserIcon,
 } from "lucide-react";
 import { logout } from "@/lib/auth";
-import { pageTitleFromPath } from "@/components/layout/navigation";
 import type { User } from "@/types";
 import styles from "./layout.module.css";
 
 const { Header } = Layout;
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 type TopbarProps = {
   alertCount: number;
-  collapsed: boolean;
   statsError: string | null;
   statsLoading: boolean;
   user: User | null;
   userLoading: boolean;
-  onCollapseChange: (collapsed: boolean) => void;
-  onRefreshStats: () => Promise<void>;
 };
 
 function userInitials(user: User | null) {
@@ -48,19 +39,13 @@ function roleLabel(role?: User["role"]) {
 
 export function Topbar({
   alertCount,
-  collapsed,
   statsError,
   statsLoading,
   user,
   userLoading,
-  onCollapseChange,
-  onRefreshStats,
 }: TopbarProps) {
-  const pathname = usePathname();
   const { message } = App.useApp();
   const [loggingOut, setLoggingOut] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const pageTitle = pageTitleFromPath(pathname);
 
   const userMenuItems = useMemo<MenuProps["items"]>(
     () => [
@@ -97,53 +82,13 @@ export function Topbar({
     }
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await onRefreshStats();
-      void message.success("Statistik diperbarui.");
-    } catch {
-      void message.error("Gagal memperbarui statistik.");
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   return (
     <Header className={styles.topbar}>
       <div className={styles.topbarLeft}>
-        <Tooltip title={collapsed ? "Buka sidebar" : "Ciutkan sidebar"}>
-          <Button
-            aria-label={collapsed ? "Buka sidebar" : "Ciutkan sidebar"}
-            className={styles.topbarIconButton}
-            icon={collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-            type="text"
-            onClick={() => onCollapseChange(!collapsed)}
-          />
-        </Tooltip>
-        <div className={styles.mobileMenuIcon}>
-          <MenuIcon aria-hidden="true" size={18} />
-        </div>
-        <div className={styles.pageTitleBlock}>
-          <Text className={styles.pageEyebrow}>Aplikasi Monitoring Susut Energi</Text>
-          <Title className={styles.pageTitle} level={3}>
-            {pageTitle}
-          </Title>
-        </div>
+        <Text className={styles.topbarAppName}>Aplikasi Monitoring Susut Energi</Text>
       </div>
 
       <Space className={styles.topbarRight} size={14}>
-        <Tooltip title={statsError || "Refresh statistik"}>
-          <Button
-            aria-label="Refresh statistik sidebar"
-            className={styles.topbarIconButton}
-            icon={<RefreshCw className={refreshing ? styles.spinIcon : undefined} size={17} />}
-            loading={refreshing}
-            type="text"
-            onClick={handleRefresh}
-          />
-        </Tooltip>
-
         <Tooltip title={statsError || "Alert data penyulang bulan ini"}>
           <Badge count={alertCount} overflowCount={99} showZero={false} size="small">
             <Button

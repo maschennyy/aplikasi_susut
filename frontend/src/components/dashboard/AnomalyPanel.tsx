@@ -1,13 +1,16 @@
 "use client";
 
-import { Alert, Card, Empty, List, Skeleton, Tag, Typography } from "antd";
+import { Card, List, Skeleton, Tag, Typography } from "antd";
+import { ShieldCheck, RefreshCw } from "lucide-react";
 import type { AnomalyItem, ExecutiveDashboardData, ResourceState } from "@/hooks/useDashboardData";
+import { EmptyState } from "@/components/shared/EmptyState";
 import styles from "./dashboard.module.css";
 
 const { Text, Title } = Typography;
 
 type AnomalyPanelProps = {
   resource: ResourceState<ExecutiveDashboardData>;
+  onRetry: () => void;
 };
 
 const severityMap: Record<AnomalyItem["severity"], { color: string; label: string }> = {
@@ -16,7 +19,7 @@ const severityMap: Record<AnomalyItem["severity"], { color: string; label: strin
   alert: { color: "red", label: "Alert" },
 };
 
-export function AnomalyPanel({ resource }: AnomalyPanelProps) {
+export function AnomalyPanel({ resource, onRetry }: AnomalyPanelProps) {
   return (
     <Card className={styles.panelCard} variant="borderless">
       <div className={styles.panelHeader}>
@@ -27,11 +30,21 @@ export function AnomalyPanel({ resource }: AnomalyPanelProps) {
       </div>
 
       {resource.error ? (
-        <Alert message="Anomali tidak dapat dimuat" description={resource.error} showIcon type="warning" />
+        <EmptyState
+          actionLabel="Coba Lagi"
+          description="Terjadi kesalahan saat mengambil data. Periksa koneksi atau coba muat ulang."
+          icon={RefreshCw}
+          title="Gagal memuat data"
+          onAction={onRetry}
+        />
       ) : resource.isLoading || !resource.data ? (
         <Skeleton active paragraph={{ rows: 8 }} />
       ) : resource.data.anomalies.length === 0 ? (
-        <Empty description="Tidak ada anomali pada periode ini" />
+        <EmptyState
+          description="Tidak ada anomali baru pada periode terpilih."
+          icon={ShieldCheck}
+          title="Tidak ada anomali"
+        />
       ) : (
         <List
           className={styles.anomalyList}

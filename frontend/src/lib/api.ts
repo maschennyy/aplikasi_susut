@@ -20,7 +20,7 @@ const CSRF_STORAGE_KEY = "pln_susut_csrf_token";
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "/flask-api";
 export const FLASK_LOGIN_PATH = process.env.NEXT_PUBLIC_FLASK_LOGIN_PATH || "/flask-login";
 export const FLASK_LOGOUT_PATH = process.env.NEXT_PUBLIC_FLASK_LOGOUT_PATH || "/flask-logout";
-export const CSRF_REFRESH_PATH = process.env.NEXT_PUBLIC_CSRF_REFRESH_PATH || "/flask-ui/";
+export const CSRF_TOKEN_PATH = process.env.NEXT_PUBLIC_CSRF_TOKEN_PATH || `${API_BASE_URL}/csrf-token`;
 export const APP_LOGIN_PATH = process.env.NEXT_PUBLIC_APP_LOGIN_PATH || "/login";
 
 let csrfTokenMemory: string | null = null;
@@ -55,32 +55,27 @@ function storeCsrfToken(token: string | null) {
   }
 }
 
-function extractCsrfToken(html: string) {
-  const metaMatch = html.match(/<meta[^>]+name=["']csrf-token["'][^>]+content=["']([^"']+)["']/i);
-  if (metaMatch?.[1]) return metaMatch[1];
-
-  const inputMatch = html.match(/<input[^>]+name=["']csrf_token["'][^>]+value=["']([^"']+)["']/i);
-  return inputMatch?.[1] || null;
-}
-
 async function fetchCsrfToken() {
   if (!isBrowser()) return null;
 
-  const candidates = [CSRF_REFRESH_PATH, FLASK_LOGIN_PATH].filter(Boolean);
-  for (const path of candidates) {
-    const response = await fetch(path, {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        Accept: "text/html",
-      },
-    });
-    const html = await response.text();
-    const token = extractCsrfToken(html);
-    if (token) {
-      storeCsrfToken(token);
-      return token;
-    }
+  const response = await fetch(CSRF_TOKEN_PATH, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    storeCsrfToken(null);
+    return null;
+  }
+
+  const payload = await response.json() as { csrf_token?: unknown };
+  const token = typeof payload.csrf_token === "string" ? payload.csrf_token : null;
+  if (token) {
+    storeCsrfToken(token);
+    return token;
   }
 
   storeCsrfToken(null);

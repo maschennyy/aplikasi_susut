@@ -1,0 +1,41 @@
+.activeFilterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  border: 1px solid #99f6e4;
+  border-radius: 999px;
+  padding: 2px 10px;
+  color: #0f766e;
+  background: #f0fdfa;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.filterChip:hover {
+  border-color: #5eead4;
+  background: #ccfbf1;
+}
+
+.resetAllButton {
+  min-height: 26px;
+  padding-inline: 8px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.resetAllButton:hover {
+  color: #be123c !important;
+  background: #fff1f2 !important;
+}

@@ -7,7 +7,6 @@ const PASSTHROUGH_PREFIXES = [
   "/flask-api",
   "/flask-login",
   "/flask-logout",
-  "/flask-ui",
 ];
 
 function isPassthroughPath(pathname: string) {

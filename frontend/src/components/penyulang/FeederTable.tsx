@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Alert, Button, Descriptions, Empty, Skeleton, Space, Table, Typography } from "antd";
+import { Descriptions, Skeleton, Space, Table, Typography } from "antd";
 import type { TableColumnsType } from "antd";
-import { RefreshCw } from "lucide-react";
+import { CalendarClock, FilterX, RefreshCw } from "lucide-react";
 import { AnomalyBadge } from "@/components/penyulang/AnomalyBadge";
+import { EmptyState } from "@/components/shared/EmptyState";
 import type { FeederMetadata, FeederRow } from "@/hooks/useFeederData";
 import styles from "./penyulang.module.css";
 
@@ -15,6 +16,10 @@ type FeederTableProps = {
   metadata: FeederMetadata;
   loading: boolean;
   error: string | null;
+  hasEntityFilters: boolean;
+  selectedPeriodLabel: string;
+  onPreviousPeriod: () => void;
+  onResetFilters: () => void;
   onRefresh: () => Promise<void>;
 };
 
@@ -48,7 +53,17 @@ function rowSeverityClass(row: FeederRow) {
   return "";
 }
 
-export function FeederTable({ rows, metadata, loading, error, onRefresh }: FeederTableProps) {
+export function FeederTable({
+  rows,
+  metadata,
+  loading,
+  error,
+  hasEntityFilters,
+  selectedPeriodLabel,
+  onPreviousPeriod,
+  onResetFilters,
+  onRefresh,
+}: FeederTableProps) {
   const [expandedRowKeys, setExpandedRowKeys] = useState<readonly React.Key[]>([]);
 
   const columns = useMemo<TableColumnsType<FeederRow>>(
@@ -151,19 +166,33 @@ export function FeederTable({ rows, metadata, loading, error, onRefresh }: Feede
 
   if (error) {
     return (
-      <Alert
-        action={
-          <Button icon={<RefreshCw aria-hidden="true" size={15} />} size="small" onClick={() => void onRefresh()}>
-            Coba Lagi
-          </Button>
-        }
-        message="Data kWh penyulang tidak bisa dimuat"
-        showIcon
-        type="error"
-        description={error}
+      <EmptyState
+        actionLabel="Coba Lagi"
+        description="Terjadi kesalahan saat mengambil data. Periksa koneksi atau coba muat ulang."
+        icon={RefreshCw}
+        title="Gagal memuat data"
+        onAction={() => void onRefresh()}
       />
     );
   }
+
+  const emptyText = hasEntityFilters ? (
+    <EmptyState
+      actionLabel="Reset Filter"
+      description="Tidak ada penyulang yang cocok dengan filter yang dipilih. Coba ubah Gardu Induk, Trafo, atau periode."
+      icon={FilterX}
+      title="Tidak ada data ditemukan"
+      onAction={onResetFilters}
+    />
+  ) : (
+    <EmptyState
+      actionLabel="Lihat Bulan Sebelumnya"
+      description={`Data untuk periode ${selectedPeriodLabel} belum tersedia. Pastikan data sudah diinput atau coba bulan sebelumnya.`}
+      icon={CalendarClock}
+      title="Belum ada data bulan ini"
+      onAction={onPreviousPeriod}
+    />
+  );
 
   return (
     <div className={styles.tableWrap}>
@@ -191,7 +220,7 @@ export function FeederTable({ rows, metadata, loading, error, onRefresh }: Feede
           onExpandedRowsChange: setExpandedRowKeys,
         }}
         locale={{
-          emptyText: <Empty description="Belum ada data penyulang untuk filter ini" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+          emptyText,
         }}
         loading={loading}
         pagination={{

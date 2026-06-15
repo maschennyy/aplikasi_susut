@@ -23,15 +23,22 @@ type LoginPayload = {
   next?: string;
 };
 
+type LoginResponse = {
+  success: boolean;
+  user?: string;
+  role?: User["role"];
+  message?: string;
+};
+
+type LogoutResponse = {
+  success: boolean;
+  message?: string;
+};
+
 function browserRedirect(path: string) {
   if (typeof window !== "undefined") {
     window.location.assign(path);
   }
-}
-
-function loginProbePath() {
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL || "/flask-api";
-  return base.startsWith("/") ? `${base.replace(/\/$/, "")}/me` : "/api/me";
 }
 
 export async function getCurrentUser() {
@@ -51,47 +58,66 @@ export async function loginWithPassword({ username, password, next }: LoginPaylo
   const body = new URLSearchParams();
   body.set("username", username);
   body.set("password", password);
-  body.set("next", next || loginProbePath());
+  if (next) body.set("next", next);
   if (csrfToken) body.set("csrf_token", csrfToken);
 
   const response = await fetch(FLASK_LOGIN_PATH, {
     method: "POST",
     credentials: "include",
     headers: {
-      Accept: "text/html,application/json",
+      Accept: "application/json",
       "Content-Type": "application/x-www-form-urlencoded",
       ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
     },
     body,
   });
 
-  if (response.status === 403) {
-    clearCsrfToken();
-    throw new Error("CSRF token tidak valid. Muat ulang form login dan coba lagi.");
+  let payload: LoginResponse | null = null;
+  try {
+    payload = await response.json() as LoginResponse;
+  } catch {
+    payload = null;
   }
 
-  const user = await getCurrentUser();
-  if (!user) {
+  if (response.status === 403) {
+    clearCsrfToken();
+    throw new Error(payload?.message || "CSRF token tidak valid. Muat ulang form login dan coba lagi.");
+  }
+
+  if (!response.ok || !payload?.success) {
     if (response.status === 429) {
-      throw new Error("Terlalu banyak percobaan login gagal. Coba lagi beberapa menit lagi.");
+      throw new Error(payload?.message || "Terlalu banyak percobaan login gagal. Coba lagi beberapa menit lagi.");
     }
-    throw new Error("Username atau password tidak sesuai.");
+    throw new Error(payload?.message || "Username atau password tidak sesuai.");
   }
 
   await getCsrfToken({ force: true });
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error("Login berhasil, tetapi profil session tidak bisa dimuat.");
+  }
   return user;
 }
 
 export async function logout() {
   const csrfToken = await getCsrfToken();
-  await fetch(FLASK_LOGOUT_PATH, {
+  const response = await fetch(FLASK_LOGOUT_PATH, {
     method: "POST",
     credentials: "include",
     headers: {
-      Accept: "text/html,application/json",
+      Accept: "application/json",
       ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
     },
   });
+  let payload: LogoutResponse | null = null;
+  try {
+    payload = await response.json() as LogoutResponse;
+  } catch {
+    payload = null;
+  }
+  if (!response.ok || payload?.success === false) {
+    throw new Error(payload?.message || "Gagal logout.");
+  }
   clearCsrfToken();
   browserRedirect(APP_LOGIN_PATH);
 }

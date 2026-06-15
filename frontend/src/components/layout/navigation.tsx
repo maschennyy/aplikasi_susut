@@ -39,7 +39,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     key: "monitoring",
     label: "Monitoring",
     items: [
-      { key: "dashboard", label: "Dashboard", href: "/", icon: LayoutDashboard },
+      { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       { key: "penyulang", label: "kWh Penyulang", href: "/penyulang", icon: Zap },
       { key: "kwh-utama", label: "kWh Utama", href: "/kwh-utama", icon: Gauge },
       { key: "kwh-pembanding", label: "kWh Pembanding", href: "/kwh-pembanding", icon: GitCompare },
@@ -82,6 +82,8 @@ export function filterNavGroups(role?: Role | null) {
 
 export function findActiveNavItem(pathname: string) {
   const allItems = NAV_GROUPS.flatMap((group) => group.items);
+  if (pathname === "/") return allItems.find((item) => item.key === "dashboard");
+
   const exactMatch = allItems.find((item) => item.href === pathname);
   if (exactMatch) return exactMatch;
 

@@ -17,10 +17,6 @@ const nextConfig: NextConfig = {
         source: "/flask-logout",
         destination: `${flaskBaseUrl}/logout`,
       },
-      {
-        source: "/flask-ui/:path*",
-        destination: `${flaskBaseUrl}/:path*`,
-      },
     ];
   },
 };
