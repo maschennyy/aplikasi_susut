@@ -138,3 +138,52 @@ Build production akan dihentikan ketika `FLASK_API_BASE_URL` kosong atau tidak v
 ```bash
 pip install -r backend/requirements.txt
 ```
+
+
+## Migrasi Database
+
+Perubahan skema dikelola dengan Flask-Migrate/Alembic. Startup aplikasi tidak lagi menjalankan `db.create_all()` atau `ALTER TABLE` otomatis.
+
+### Database baru
+
+```bash
+npm run backend:db:upgrade
+npm run backend:admin
+```
+
+Perintah pertama membuat seluruh tabel sampai revision terbaru. Perintah kedua membuat akun admin secara interaktif.
+
+### Database lama yang sudah berisi data
+
+1. Buat backup database.
+2. Pastikan kode aplikasi sesuai dengan skema yang sedang digunakan.
+3. Jalankan pemeriksaan:
+
+```bash
+npm run backend:db:check
+```
+
+4. Hanya ketika pemeriksaan lulus, tandai database existing sebagai baseline:
+
+```bash
+python -m flask --app backend.entrypoint db stamp head
+```
+
+5. Jalankan upgrade untuk revision berikutnya:
+
+```bash
+npm run backend:db:upgrade
+```
+
+`db stamp` tidak membuat atau mengubah tabel. Perintah tersebut hanya mencatat revision Alembic, sehingga tidak boleh dijalankan sebelum backup dan `schema-check` lulus.
+
+### Membuat revision baru
+
+Setelah mengubah `backend/models.py`:
+
+```bash
+python -m flask --app backend.entrypoint db migrate -m "jelaskan perubahan"
+python -m flask --app backend.entrypoint db upgrade
+```
+
+Selalu tinjau file revision yang dihasilkan sebelum menjalankan upgrade pada database operasional.

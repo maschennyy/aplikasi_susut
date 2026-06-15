@@ -10,7 +10,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "backend:db:upgrade": "python -m flask --app backend.entrypoint db upgrade",
+    "backend:db:check": "python -m flask --app backend.entrypoint schema-check",
+    "backend:admin": "python -m flask --app backend.entrypoint create-admin"
   },
   "dependencies": {
     "@ant-design/icons": "latest",
