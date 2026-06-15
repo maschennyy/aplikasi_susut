@@ -71,11 +71,29 @@ Backend tersedia di `http://127.0.0.1:5000`.
 
 ## Menjalankan Test Backend
 
-Dari root repository:
+Pastikan dependency Python sudah terpasang, kemudian jalankan dari root repository:
 
 ```bash
 npm run backend:test
 ```
+
+Test otomatis memakai:
+
+```env
+APP_ENV=test
+TEST_DATABASE_URL=sqlite+pysqlite:///:memory:
+```
+
+Database PostgreSQL pada `DATABASE_URL` tidak digunakan selama test. Suite test memeriksa:
+
+- startup Flask;
+- pembuatan tabel inti pada SQLite sementara;
+- endpoint CSRF dan security headers;
+- endpoint sidebar stats;
+- identitas package/import backend;
+- rumus susut bulanan dan kumulatif tanpa EMIN.
+
+GitHub Actions menjalankan suite yang sama secara otomatis ketika file backend terkait berubah pada push atau pull request.
 
 ## Seed Data Development
 
