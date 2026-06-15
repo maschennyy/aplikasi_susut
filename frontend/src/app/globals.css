@@ -1,0 +1,77 @@
+:root {
+  color-scheme: light;
+  --app-background: #f4f7fb;
+  --app-foreground: #102033;
+  --surface: #ffffff;
+  --surface-subtle: #f8fafc;
+  --surface-raised: rgba(255, 255, 255, 0.88);
+  --border-soft: #d9e3ef;
+  --text-muted: #64748b;
+  --pln-navy: #073b86;
+  --pln-blue: #0b63ce;
+  --pln-cyan: #00a3d7;
+  --pln-teal: #0f9f8f;
+  --status-amber: #d78312;
+  --status-red: #d33f49;
+  --status-green: #12805c;
+  --shadow-soft: 0 18px 44px rgba(13, 31, 58, 0.08);
+  --shadow-panel: 0 18px 50px rgba(13, 31, 58, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--app-background);
+  color: var(--app-foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-feature-settings: "cv02" 1, "cv03" 1, "cv04" 1;
+  text-rendering: geometricPrecision;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.ant-typography,
+.ant-btn,
+.ant-input,
+.ant-select,
+.ant-picker,
+.ant-table,
+.ant-menu,
+.ant-dropdown-menu,
+.ant-modal,
+.ant-card,
+.ant-alert {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+.ant-btn {
+  box-shadow: none;
+}
+
+.ant-btn-primary {
+  box-shadow: 0 10px 22px rgba(7, 59, 134, 0.18);
+}
+
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-select-selector,
+.ant-picker {
+  border-color: var(--border-soft) !important;
+}
+
+.ant-table-cell {
+  font-variant-numeric: tabular-nums;
+}

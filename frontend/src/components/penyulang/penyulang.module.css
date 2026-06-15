@@ -1,0 +1,172 @@
+.pageStack {
+  display: grid;
+  gap: 18px;
+}
+
+.pageToolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 64px;
+}
+
+.pageToolbar h2 {
+  margin: 0 !important;
+  color: #0f172a !important;
+  font-size: 24px !important;
+  font-weight: 780 !important;
+  line-height: 1.2 !important;
+}
+
+.toolbarMeta {
+  display: block;
+  margin-top: 3px;
+  color: #667085 !important;
+}
+
+.toolbarActions,
+.filterRow,
+.summaryRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toolbarActions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.filterRow {
+  justify-content: space-between;
+}
+
+.summaryRow {
+  flex-wrap: wrap;
+}
+
+.panelCard {
+  border: 1px solid #dfe8f4;
+  border-radius: 8px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+}
+
+.panelCard :global(.ant-card-body) {
+  padding: 18px;
+}
+
+.metricPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  border: 1px solid #dfe8f4;
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #344054;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.metricPill strong {
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.primaryCell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.primaryCell strong {
+  color: #0f172a;
+  font-weight: 720;
+}
+
+.monoCell,
+.percentAlert {
+  font-variant-numeric: tabular-nums;
+}
+
+.percentAlert {
+  color: #b42318;
+  font-weight: 720;
+}
+
+.tableWrap {
+  display: grid;
+  gap: 12px;
+}
+
+.tableSkeleton {
+  border: 1px solid #dfe8f4;
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.tableSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tableSummary span {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  border: 1px solid #dfe8f4;
+  border-radius: 8px;
+  padding: 5px 9px;
+  color: #475467;
+  background: #f8fafc;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tableWrap :global(.ant-table-row) {
+  cursor: pointer;
+}
+
+.warningRow :global(td) {
+  background: #fffaf0 !important;
+}
+
+.alertRow :global(td) {
+  background: #fff5f5 !important;
+}
+
+.uploadStack {
+  display: grid;
+  gap: 16px;
+}
+
+.uploadStack :global(.ant-upload-drag-icon) {
+  color: #003087;
+}
+
+.uploadResult {
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.uploadResult :global(.ant-list-item) {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+@media (max-width: 1279px) {
+  .pageToolbar,
+  .filterRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .toolbarActions {
+    justify-content: flex-start;
+  }
+}
