@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const LOCAL_FLASK_BASE_URL = "http://127.0.0.1:5000";
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
+const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
 
 function resolveFlaskBaseUrl() {
   const configuredUrl = process.env.FLASK_API_BASE_URL?.trim();
@@ -29,7 +30,7 @@ function resolveFlaskBaseUrl() {
     );
   }
 
-  if (!new Set(["http:", "https:"]).has(parsedUrl.protocol)) {
+  if (!ALLOWED_PROTOCOLS.has(parsedUrl.protocol)) {
     throw new Error("FLASK_API_BASE_URL hanya mendukung protokol http atau https.");
   }
 
@@ -41,6 +42,13 @@ function resolveFlaskBaseUrl() {
     throw new Error("FLASK_API_BASE_URL tidak boleh memuat query string atau fragment.");
   }
 
+  if (parsedUrl.pathname !== "/") {
+    throw new Error(
+      "FLASK_API_BASE_URL harus berupa origin backend tanpa path tambahan. " +
+        "Gunakan https://api.example.com, bukan https://api.example.com/api.",
+    );
+  }
+
   if (isVercelProduction && LOOPBACK_HOSTNAMES.has(parsedUrl.hostname)) {
     throw new Error(
       "FLASK_API_BASE_URL pada Vercel production tidak boleh mengarah ke localhost. " +
@@ -48,7 +56,7 @@ function resolveFlaskBaseUrl() {
     );
   }
 
-  return parsedUrl.toString().replace(/\/$/, "");
+  return parsedUrl.origin;
 }
 
 const flaskBaseUrl = resolveFlaskBaseUrl();
