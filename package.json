@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "backend": "python backend/app.py",
-    "backend:seed": "python backend/seed_data.py",
+    "backend": "python -m backend.entrypoint",
+    "backend:seed": "python -m backend.seed_data",
+    "backend:test": "python -m unittest discover -s backend/tests -v",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
