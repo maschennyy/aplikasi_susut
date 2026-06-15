@@ -1,10 +1,9 @@
 """
-app.py v5 — Aplikasi Susut Energi
-Semua route yang direferensikan di base.html sudah ada.
+app.py v5 — Aplikasi Susut Energi API
+Flask berjalan sebagai REST API backend untuk frontend terpisah.
 """
 
-from flask import (Flask, Response, abort, g, jsonify, redirect,
-                   render_template, request, send_file, session, url_for)
+from flask import Flask, Response, abort, g, jsonify, request, send_file, session
 from config import Config
 from models import (db, GarduInduk, Trafo, Penyulang,
                     MeterReading, FeederReading,
@@ -30,7 +29,7 @@ import pandas as pd
 import secrets
 import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=None)
 app.config.from_object(Config)
 Config.validate()
 app.permanent_session_lifetime = timedelta(hours=app.config.get('PERMANENT_SESSION_HOURS', 8))
@@ -92,11 +91,11 @@ with app.app_context():
 
 
 # ════════════════════════════════════════════════
-# HALAMAN — semua route yang ada di sidebar
+# KONFIGURASI SECURITY, ROLE, DAN WORKFLOW
 # ════════════════════════════════════════════════
 
 SAFE_METHODS = {'GET', 'HEAD', 'OPTIONS'}
-PUBLIC_ENDPOINTS = {'login', 'static'}
+PUBLIC_ENDPOINTS = {'login', 'api_csrf_token'}
 WRITE_ROLES = {'admin', 'operator'}
 ALLOWED_GENERIC_UPLOADS = {'csv', 'xlsx', 'xlsm', 'xls'}
 ALLOWED_NKWH_UPLOADS = {'xlsx', 'xlsm'}
@@ -261,10 +260,6 @@ def _json_error(message, status=400):
     return jsonify({'error': message}), status
 
 
-def _wants_json():
-    return request.path.startswith('/api/') or request.accept_mimetypes.best == 'application/json'
-
-
 def _client_ip():
     forwarded = request.headers.get('X-Forwarded-For')
     if forwarded:
@@ -319,9 +314,7 @@ def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if not getattr(g, 'current_user', None):
-            if _wants_json():
-                return _json_error('Login diperlukan.', 401)
-            return redirect(url_for('login', next=request.full_path if request.query_string else request.path))
+            return _json_error('Login diperlukan.', 401)
         return view(*args, **kwargs)
     return wrapped
 
@@ -332,12 +325,8 @@ def role_required(*roles):
         def wrapped(*args, **kwargs):
             user = getattr(g, 'current_user', None)
             if not user:
-                if _wants_json():
-                    return _json_error('Login diperlukan.', 401)
-                return redirect(url_for('login', next=request.path))
+                return _json_error('Login diperlukan.', 401)
             if user.role not in roles:
-                if _wants_json():
-                    return _json_error('Akses ditolak untuk role ini.', 403)
                 abort(403)
             return view(*args, **kwargs)
         return wrapped
@@ -1171,14 +1160,6 @@ def _validate_upload_file(file, allowed_extensions):
     return filename, ext
 
 
-@app.context_processor
-def inject_security_context():
-    return {
-        'csrf_token': csrf_token,
-        'current_user': lambda: getattr(g, 'current_user', None),
-    }
-
-
 @app.before_request
 def apply_security_gate():
     g.current_user = _current_user()
@@ -1190,14 +1171,10 @@ def apply_security_gate():
         return None
 
     if request.method not in SAFE_METHODS and not _validate_csrf():
-        if _wants_json():
-            return _json_error('CSRF token tidak valid.', 403)
-        abort(403)
+        return _json_error('CSRF token tidak valid.', 403)
 
     if app.config.get('SECURITY_REQUIRE_LOGIN', True) and not g.current_user:
-        if _wants_json():
-            return _json_error('Login diperlukan.', 401)
-        return redirect(url_for('login', next=request.full_path if request.query_string else request.path))
+        return _json_error('Login diperlukan.', 401)
     return None
 
 
@@ -1242,202 +1219,83 @@ def create_admin_command(username, password, name):
     click.echo(f'Admin {username} berhasil {action}.')
 
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['POST'])
 def login():
-    if request.method == 'POST':
-        if not _validate_csrf():
-            abort(403)
-        username = (request.form.get('username') or '').strip()
-        password = request.form.get('password') or ''
-        rate_key = _login_rate_key(username)
-        if _is_login_locked(rate_key):
-            _safe_commit_audit('LOGIN_RATE_LIMITED', detail={'username': username}, status='FAILED', username=username)
-            return render_template('login.html',
-                                   error='Terlalu banyak percobaan login gagal. Coba lagi beberapa menit lagi.',
-                                   next_url=request.form.get('next', '')), 429
-        if _rate_limited(
-            LOGIN_FAILURES,
-            rate_key,
-            app.config.get('LOGIN_RATE_LIMIT', 5),
-            app.config.get('LOGIN_RATE_WINDOW_MINUTES', 15),
-        ):
-            _safe_commit_audit('LOGIN_RATE_LIMITED', detail={'username': username}, status='FAILED', username=username)
-            return render_template('login.html',
-                                   error='Terlalu banyak percobaan login gagal. Coba lagi beberapa menit lagi.',
-                                   next_url=request.form.get('next', '')), 429
-        user = User.query.filter_by(username=username).first()
-        if user and user.aktif and user.check_password(password):
-            _login_user(user)
-            g.current_user = user
-            _clear_rate_events(LOGIN_FAILURES, rate_key)
-            _audit('LOGIN', entity_type='user', entity_id=user.id, detail={'username': user.username})
-            db.session.commit()
-            next_url = request.form.get('next') or url_for('dashboard')
-            if not next_url.startswith('/'):
-                next_url = url_for('dashboard')
-            return redirect(next_url)
+    if not _validate_csrf():
+        return jsonify({
+            'success': False,
+            'message': 'CSRF token tidak valid.',
+        }), 403
 
-        _record_rate_event(LOGIN_FAILURES, rate_key, app.config.get('LOGIN_RATE_WINDOW_MINUTES', 15))
-        if _rate_limited(
-            LOGIN_FAILURES,
-            rate_key,
-            app.config.get('LOGIN_RATE_LIMIT', 5),
-            app.config.get('LOGIN_RATE_WINDOW_MINUTES', 15),
-        ):
-            _lock_login(rate_key)
-        _safe_commit_audit('LOGIN_FAILED', detail={'username': username}, status='FAILED', username=username)
-        return render_template('login.html', error='Username atau password tidak sesuai.', next_url=request.form.get('next', ''))
+    username = (request.form.get('username') or '').strip()
+    password = request.form.get('password') or ''
+    rate_key = _login_rate_key(username)
+    if _is_login_locked(rate_key):
+        _safe_commit_audit('LOGIN_RATE_LIMITED', detail={'username': username}, status='FAILED', username=username)
+        return jsonify({
+            'success': False,
+            'message': 'Terlalu banyak percobaan login gagal. Coba lagi beberapa menit lagi.',
+        }), 429
+    if _rate_limited(
+        LOGIN_FAILURES,
+        rate_key,
+        app.config.get('LOGIN_RATE_LIMIT', 5),
+        app.config.get('LOGIN_RATE_WINDOW_MINUTES', 15),
+    ):
+        _safe_commit_audit('LOGIN_RATE_LIMITED', detail={'username': username}, status='FAILED', username=username)
+        return jsonify({
+            'success': False,
+            'message': 'Terlalu banyak percobaan login gagal. Coba lagi beberapa menit lagi.',
+        }), 429
 
-    if getattr(g, 'current_user', None):
-        return redirect(url_for('dashboard'))
-    return render_template('login.html', next_url=request.args.get('next', ''))
+    user = User.query.filter_by(username=username).first()
+    if user and user.aktif and user.check_password(password):
+        _login_user(user)
+        g.current_user = user
+        _clear_rate_events(LOGIN_FAILURES, rate_key)
+        _audit('LOGIN', entity_type='user', entity_id=user.id, detail={'username': user.username})
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'user': user.username,
+            'role': user.role,
+        }), 200
+
+    _record_rate_event(LOGIN_FAILURES, rate_key, app.config.get('LOGIN_RATE_WINDOW_MINUTES', 15))
+    if _rate_limited(
+        LOGIN_FAILURES,
+        rate_key,
+        app.config.get('LOGIN_RATE_LIMIT', 5),
+        app.config.get('LOGIN_RATE_WINDOW_MINUTES', 15),
+    ):
+        _lock_login(rate_key)
+    _safe_commit_audit('LOGIN_FAILED', detail={'username': username}, status='FAILED', username=username)
+    return jsonify({
+        'success': False,
+        'message': 'Username atau password salah',
+    }), 401
 
 
 @app.route('/logout', methods=['POST'])
 def logout():
     if not _validate_csrf():
-        abort(403)
+        return jsonify({
+            'success': False,
+            'message': 'CSRF token tidak valid.',
+        }), 403
     username = session.get('username')
     _safe_commit_audit('LOGOUT', detail={'username': username}, username=username)
     _logout_user()
-    return redirect(url_for('login'))
+    return jsonify({'success': True}), 200
 
 
-@app.route('/')
-def dashboard():
-    return render_template('dashboard.html')
-
-@app.route('/penyulang')
-def halaman_penyulang():
-    return render_template('penyulang.html',
-        eyebrow='Gardu Induk', judul='kWh Penyulang',
-        icon='plug', desc='Data pembacaan meter per penyulang.')
-
-
-def _render_meter_page(mode='utama'):
-    is_pembanding = mode == 'pembanding'
-    return render_template('meter_gi.html',
-        eyebrow='Gardu Induk',
-        judul='kWh Pembanding' if is_pembanding else 'kWh Utama',
-        icon='gauge' if is_pembanding else 'bolt',
-        desc='Data kWh meter pembanding per trafo gardu induk.' if is_pembanding else 'Data kWh meter utama per trafo gardu induk.',
-        meter_mode='pembanding' if is_pembanding else 'utama',
-        primary_total_label='Total MP Tahun' if is_pembanding else 'Total MU Tahun',
-        secondary_total_label='Total MU Tahun' if is_pembanding else 'Total MP Tahun',
-        primary_meta='meter pembanding' if is_pembanding else 'meter utama',
-        secondary_meta='meter utama' if is_pembanding else 'meter pembanding',
-        primary_icon='gauge' if is_pembanding else 'bolt',
-        secondary_icon='bolt' if is_pembanding else 'gauge',
-        primary_name='Meter Pembanding' if is_pembanding else 'Meter Utama',
-        secondary_name='Meter Utama' if is_pembanding else 'Meter Pembanding',
-        primary_short='MP' if is_pembanding else 'MU',
-        secondary_short='MU' if is_pembanding else 'MP',
-        chart_title='Tren MP vs MU' if is_pembanding else 'Tren MU vs MP',
-        focus_chart_title='Pemakaian MP per Trafo' if is_pembanding else 'Pemakaian MU per Trafo',
-        table_title='Rekap kWh Pembanding per Trafo' if is_pembanding else 'Rekap kWh Utama per Trafo',
-        export_name='kwh_pembanding' if is_pembanding else 'kwh_utama')
-
-
-@app.route('/kwh-utama')
-def halaman_kwh_utama():
-    return _render_meter_page('utama')
-
-
-@app.route('/kwh-pembanding')
-def halaman_kwh_pembanding():
-    return _render_meter_page('pembanding')
-
-
-@app.route('/meter-gi')
-def halaman_meter_gi():
-    return _render_meter_page('utama')
-
-
-@app.route('/psgi')
-def halaman_psgi():
-    return render_template('rekap.html',
-        eyebrow='Gardu Induk', judul='PSGI',
-        icon='building-factory-2',
-        desc='Pemakaian sendiri gardu induk per periode dan relasinya terhadap perhitungan susut.')
-
-@app.route('/deviasi')
-def halaman_deviasi():
-    return render_template('deviasi.html',
-        eyebrow='Gardu Induk', judul='Deviasi',
-        icon='chart-bar', desc='Perbandingan MU vs MP vs total penyulang.')
-
-@app.route('/proporsional')
-def halaman_proporsional():
-    return render_template('proporsional.html',
-        eyebrow='UID', judul='Proporsional',
-        icon='percentage', desc='Alokasi energi proporsional per penyulang.')
-
-@app.route('/transfer-antar-uid')
-def halaman_transfer_antar_uid():
-    return render_template('transfer_uid.html',
-        eyebrow='UID', judul='Transfer Antar UID',
-        icon='arrows-transfer-up', desc='Rekap ekspor dan impor energi antar UID.')
-
-@app.route('/transfer')
-def halaman_transfer():
-    return render_template('transfer.html',
-        eyebrow='UID', judul='Transfer EXIM',
-        icon='arrows-exchange', desc='Monitoring ekspor dan impor energi antar unit.')
-
-@app.route('/rekap')
-def halaman_rekap():
-    return render_template('rekap.html',
-        eyebrow='Rekap kWh', judul='Rekap kWh',
-        icon='report', desc='Rekap kWh dan susut per GI per bulan.')
-
-
-@app.route('/kwh-jual')
-def halaman_kwh_jual():
-    return render_template('kwh_jual.html',
-        eyebrow='Transaksi', judul='kWh Jual',
-        icon='receipt-2', desc='Data transaksi kWh jual pelanggan sebagai referensi alokasi dan transfer.')
-
-
-@app.route('/emin')
-def halaman_emin():
-    return render_template('rekap.html',
-        eyebrow='Transaksi', judul='EMIN',
-        icon='file-analytics', desc='Data EMIN sebagai pendukung transaksi dan rekonsiliasi energi.')
-
-
-@app.route('/profile')
-def halaman_profile():
-    return render_template('profile.html',
-        eyebrow='Akun', judul='Profile',
-        icon='user-circle', desc='Informasi akun dan preferensi akses aplikasi.')
-
-
-@app.route('/master-data')
-@role_required('admin', 'operator')
-def halaman_master_data():
-    return render_template('master_data.html',
-        eyebrow='Data Master', judul='Master Data',
-        icon='database', desc='Kelola master GI, trafo, penyulang, dan area/UP3.')
-
-
-@app.route('/upload')
-@role_required('admin', 'operator')
-def halaman_upload():
-    return render_template('upload.html',
-        eyebrow='Laporan', judul='Upload NKWh',
-        icon='upload', desc='Upload file NKWh Excel/CSV untuk import data penyulang.')
-
-
-@app.route('/security')
-@role_required('admin')
-def halaman_security():
-    return render_template('security.html',
-        eyebrow='Admin', judul='Security',
-        icon='shield-lock', desc='Manajemen user dan audit log aplikasi.')
+@app.route('/api/csrf-token')
+def api_csrf_token():
+    return jsonify({'csrf_token': csrf_token()})
 
 
 # ════════════════════════════════════════════════
-# API — SIDEBAR STATS (diload di base.html)
+# API — SIDEBAR STATS
 # ════════════════════════════════════════════════
 
 @app.route('/api/sidebar-stats')
@@ -3244,38 +3102,37 @@ def api_upload_penyulang():
 
 @app.errorhandler(403)
 def forbidden(e):
-    if _wants_json():
-        return jsonify({'error': 'Akses ditolak.'}), 403
-    return render_template('error.html',
-                           kode=403,
-                           judul='Akses Ditolak',
-                           pesan='Kamu tidak memiliki izin untuk membuka halaman ini.'), 403
+    return jsonify({
+        'error': 'Forbidden',
+        'message': str(e),
+        'status_code': 403,
+    }), 403
 
 
 @app.errorhandler(413)
 def payload_too_large(e):
     max_mb = app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
-    if _wants_json():
-        return jsonify({'error': f'Ukuran file melebihi batas {max_mb} MB.'}), 413
-    return render_template('error.html',
-                           kode=413,
-                           judul='File Terlalu Besar',
-                           pesan=f'Ukuran file melebihi batas {max_mb} MB.'), 413
+    return jsonify({
+        'error': 'Payload Too Large',
+        'message': f'Ukuran file melebihi batas {max_mb} MB.',
+        'status_code': 413,
+    }), 413
 
 
 @app.errorhandler(404)
 def not_found(e):
-    return render_template('error.html',
-                           kode=404,
-                           judul='Halaman Tidak Ditemukan',
-                           pesan='URL yang kamu akses tidak ada.'), 404
+    return jsonify({
+        'error': 'Not Found',
+        'message': str(e),
+        'status_code': 404,
+    }), 404
 
 @app.errorhandler(500)
 def server_error(e):
-    return render_template('error.html',
-                           kode=500,
-                           judul='Server Error',
-                           pesan='Terjadi kesalahan di server. Cek log untuk detail.'), 500
+    return jsonify({
+        'error': 'Internal Server Error',
+        'status_code': 500,
+    }), 500
 
 
 # ════════════════════════════════════════════════

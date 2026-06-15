@@ -57,6 +57,19 @@
   padding: 18px;
 }
 
+.modeBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border: 1px solid #b7e7fb;
+  border-radius: 8px;
+  padding: 5px 10px;
+  color: var(--pln-blue);
+  background: #e9f7ff;
+  font-size: 12px;
+  font-weight: 680;
+}
+
 .metricPill {
   display: inline-flex;
   align-items: center;
@@ -78,6 +91,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+.tableWrap {
+  display: grid;
+  gap: 12px;
+}
+
+.tableSkeleton {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 18px;
+}
+
 .primaryCell {
   display: flex;
   min-width: 0;
@@ -90,78 +114,20 @@
   font-weight: 720;
 }
 
-.monoCell,
-.percentAlert {
+.monoCell {
   font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-variant-numeric: tabular-nums;
 }
 
-.percentAlert {
-  color: var(--status-red);
+.summaryCell {
+  color: var(--app-foreground);
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-weight: 720;
-}
-
-.tableWrap {
-  display: grid;
-  gap: 12px;
-}
-
-.tableSkeleton {
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
-  padding: 18px;
-}
-
-.tableSummary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tableSummary span {
-  display: inline-flex;
-  min-height: 30px;
-  align-items: center;
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
-  padding: 5px 9px;
-  color: #52637a;
-  background: #f6f9fd;
-  font-size: 12px;
-  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-variant-numeric: tabular-nums;
 }
 
-.tableWrap :global(.ant-table-row) {
-  cursor: pointer;
-}
-
-.warningRow :global(td) {
-  background: #fff8e8 !important;
-}
-
-.alertRow :global(td) {
-  background: #fff1f3 !important;
-}
-
-.uploadStack {
-  display: grid;
-  gap: 16px;
-}
-
-.uploadStack :global(.ant-upload-drag-icon) {
-  color: var(--pln-blue);
-}
-
-.uploadResult {
-  display: grid;
-  gap: 12px;
-  margin-top: 10px;
-}
-
-.uploadResult :global(.ant-list-item) {
-  justify-content: flex-start;
-  gap: 8px;
+.tableWrap :global(.ant-table-summary) {
+  background: #f6f9fd;
 }
 
 @media (max-width: 1279px) {

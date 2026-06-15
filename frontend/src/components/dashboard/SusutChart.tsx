@@ -45,14 +45,14 @@ export function SusutChart({ resource }: SusutChartProps) {
             <AreaChart data={resource.data.monthlyData} margin={{ bottom: 0, left: 0, right: 18, top: 16 }}>
               <defs>
                 <linearGradient id="susutFill" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="5%" stopColor="#005baa" stopOpacity={0.32} />
-                  <stop offset="95%" stopColor="#005baa" stopOpacity={0.02} />
+                  <stop offset="5%" stopColor="#00a3d7" stopOpacity={0.34} />
+                  <stop offset="95%" stopColor="#0f9f8f" stopOpacity={0.03} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#e5edf7" strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="monthLabel" tick={{ fill: "#667085", fontSize: 12 }} tickLine={false} />
+              <CartesianGrid stroke="#e7edf5" strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="monthLabel" tick={{ fill: "#64748b", fontSize: 12 }} tickLine={false} />
               <YAxis
-                tick={{ fill: "#667085", fontSize: 12 }}
+                tick={{ fill: "#64748b", fontSize: 12 }}
                 tickFormatter={(value: number) => `${value.toFixed(1)}%`}
                 tickLine={false}
                 width={58}
@@ -66,7 +66,7 @@ export function SusutChart({ resource }: SusutChartProps) {
                 dataKey="susutPersen"
                 fill="url(#susutFill)"
                 name="Susut"
-                stroke="#005baa"
+                stroke="#00a3d7"
                 strokeWidth={2.5}
                 type="monotone"
               />
