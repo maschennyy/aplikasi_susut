@@ -3,9 +3,30 @@ app.py v5 — Aplikasi Susut Energi API
 Flask berjalan sebagai REST API backend untuk frontend terpisah.
 """
 
-from flask import Flask, Response, abort, g, jsonify, request, send_file, session
+from flask import Flask, Response, g, jsonify, request, send_file
 from flask_migrate import Migrate
 from .config import Config
+from .core.auth import (
+    current_user as _current_user,
+    logout_user as _logout_user,
+    safe_commit_audit as _safe_commit_audit,
+    validate_csrf as _validate_csrf,
+)
+from .core.constants import (
+    ALLOWED_GENERIC_UPLOADS,
+    ALLOWED_NKWH_UPLOADS,
+    PUBLIC_ENDPOINTS,
+    SAFE_METHODS,
+    WRITE_ROLES,
+    XLS_SIGNATURE,
+)
+from .core.security import (
+    audit as _audit,
+    client_ip as _client_ip,
+    json_error as _json_error,
+    request_payload as _request_payload,
+    validate_password_policy as _validate_password_policy,
+)
 from .models import (db, GarduInduk, Trafo, Penyulang,
                      MeterReading, FeederReading,
                      TransferAntarUnit, RekapBulanan,
@@ -29,7 +50,6 @@ from sqlalchemy import and_
 from collections import defaultdict, deque
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from functools import wraps
 from pathlib import Path
 from werkzeug.utils import secure_filename
 from openpyxl import Workbook
@@ -37,9 +57,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 import click
 import io
-import json
 import pandas as pd
-import secrets
 import os
 
 app = Flask(__name__, static_folder=None)
@@ -69,91 +87,11 @@ app.register_blueprint(upload_bp)
 app.register_blueprint(workflow_bp)
 
 # ════════════════════════════════════════════════
-# KONFIGURASI SECURITY, ROLE, DAN WORKFLOW
+# KONFIGURASI DATA LOKAL
 # ════════════════════════════════════════════════
 
-SAFE_METHODS = {'GET', 'HEAD', 'OPTIONS'}
-PUBLIC_ENDPOINTS = {'login', 'api_csrf_token', 'auth.login', 'auth.api_csrf_token'}
-WRITE_ROLES = {'admin', 'operator'}
-ALLOWED_GENERIC_UPLOADS = {'csv', 'xlsx', 'xlsm', 'xls'}
-ALLOWED_NKWH_UPLOADS = {'xlsx', 'xlsm'}
-XLS_SIGNATURE = bytes.fromhex('d0cf11e0a1b11ae1')
-LOGIN_FAILURES = defaultdict(deque)
-LOGIN_LOCKOUTS = {}
 UPLOAD_EVENTS = defaultdict(deque)
-ROLES = {'admin', 'operator', 'viewer', 'auditor'}
-MODULE_ACCESS_MATRIX = [
-    {
-        'module': 'Dashboard',
-        'group': 'Dashboard',
-        'access': {
-            'read': ['viewer', 'auditor', 'operator', 'admin'],
-            'export': ['auditor', 'operator', 'admin'],
-        },
-    },
-    {
-        'module': 'Gardu Induk',
-        'group': 'Gardu Induk',
-        'access': {
-            'read': ['viewer', 'auditor', 'operator', 'admin'],
-            'write': ['operator', 'admin'],
-            'export': ['auditor', 'operator', 'admin'],
-            'finalize': ['operator', 'admin'],
-            'lock': ['admin'],
-        },
-    },
-    {
-        'module': 'UID',
-        'group': 'UID',
-        'access': {
-            'read': ['viewer', 'auditor', 'operator', 'admin'],
-            'write': ['operator', 'admin'],
-            'export': ['auditor', 'operator', 'admin'],
-        },
-    },
-    {
-        'module': 'Master Data',
-        'group': 'Master',
-        'access': {
-            'read': ['operator', 'admin'],
-            'write': ['operator', 'admin'],
-            'audit': ['admin'],
-        },
-    },
-    {
-        'module': 'Rekap kWh',
-        'group': 'Master',
-        'access': {
-            'read': ['viewer', 'auditor', 'operator', 'admin'],
-            'export': ['auditor', 'operator', 'admin'],
-        },
-    },
-    {
-        'module': 'Transaksi',
-        'group': 'Transaksi',
-        'access': {
-            'read': ['viewer', 'auditor', 'operator', 'admin'],
-            'write': ['operator', 'admin'],
-        },
-    },
-    {
-        'module': 'Security',
-        'group': 'Admin',
-        'access': {
-            'read': ['admin'],
-            'write': ['admin'],
-            'audit': ['admin'],
-        },
-    },
-    {
-        'module': 'Profile',
-        'group': 'Akun',
-        'access': {
-            'read': ['viewer', 'auditor', 'operator', 'admin'],
-            'self_update': ['viewer', 'auditor', 'operator', 'admin'],
-        },
-    },
-]
+
 KWH_JUAL_GROUP_LABELS = {
     'S': 'Sosial',
     'R': 'Rumah Tangga',
@@ -211,83 +149,6 @@ KWH_JUAL_CATALOG = [
 KWH_JUAL_SUB_INDEX = {item['sub_golongan']: item for item in KWH_JUAL_CATALOG}
 
 
-def _json_error(message, status=400):
-    return jsonify({'error': message}), status
-
-
-def _client_ip():
-    forwarded = request.headers.get('X-Forwarded-For')
-    if forwarded:
-        return forwarded.split(',')[0].strip()
-    return request.remote_addr or 'unknown'
-
-
-def _current_user():
-    user_id = session.get('user_id')
-    if not user_id:
-        return None
-    return db.session.get(User, user_id)
-
-
-def _ensure_csrf_token():
-    token = session.get('csrf_token')
-    if not token:
-        token = secrets.token_urlsafe(32)
-        session['csrf_token'] = token
-    return token
-
-
-def csrf_token():
-    return _ensure_csrf_token()
-
-
-def _validate_csrf():
-    expected = session.get('csrf_token')
-    supplied = (
-        request.headers.get('X-CSRFToken') or
-        request.headers.get('X-CSRF-Token') or
-        request.form.get('csrf_token')
-    )
-    return bool(expected and supplied and secrets.compare_digest(expected, supplied))
-
-
-def _login_user(user):
-    session.clear()
-    session.permanent = True
-    session['user_id'] = user.id
-    session['username'] = user.username
-    session['role'] = user.role
-    _ensure_csrf_token()
-    user.last_login_at = datetime.utcnow()
-
-
-def _logout_user():
-    session.clear()
-
-
-def login_required(view):
-    @wraps(view)
-    def wrapped(*args, **kwargs):
-        if not getattr(g, 'current_user', None):
-            return _json_error('Login diperlukan.', 401)
-        return view(*args, **kwargs)
-    return wrapped
-
-
-def role_required(*roles):
-    def decorator(view):
-        @wraps(view)
-        def wrapped(*args, **kwargs):
-            user = getattr(g, 'current_user', None)
-            if not user:
-                return _json_error('Login diperlukan.', 401)
-            if user.role not in roles:
-                abort(403)
-            return view(*args, **kwargs)
-        return wrapped
-    return decorator
-
-
 def _prune_events(events, window_minutes):
     cutoff = datetime.utcnow() - timedelta(minutes=window_minutes)
     while events and events[0] < cutoff:
@@ -306,58 +167,9 @@ def _record_rate_event(bucket, key, window_minutes):
     events.append(datetime.utcnow())
 
 
-def _clear_rate_events(bucket, key):
-    bucket.pop(key, None)
-
-
-def _is_login_locked(key):
-    until = LOGIN_LOCKOUTS.get(key)
-    if not until:
-        return False
-    if until <= datetime.utcnow():
-        LOGIN_LOCKOUTS.pop(key, None)
-        return False
-    return True
-
-
-def _lock_login(key):
-    LOGIN_LOCKOUTS[key] = datetime.utcnow() + timedelta(minutes=app.config.get('LOGIN_LOCKOUT_MINUTES', 15))
-
-
-def _login_rate_key(username):
-    return f'{_client_ip()}:{(username or "").lower()}'
-
-
 def _upload_rate_key():
     user = getattr(g, 'current_user', None)
     return f'{user.id if user else "anon"}:{_client_ip()}'
-
-
-def _validate_password_policy(password):
-    min_len = app.config.get('PASSWORD_MIN_LENGTH', 10)
-    if len(password or '') < min_len:
-        return f'Password minimal {min_len} karakter.'
-    checks = [
-        any(ch.islower() for ch in password),
-        any(ch.isupper() for ch in password),
-        any(ch.isdigit() for ch in password),
-        any(not ch.isalnum() for ch in password),
-    ]
-    if sum(checks) < 3:
-        return 'Password harus memakai minimal 3 jenis karakter: huruf kecil, huruf besar, angka, atau simbol.'
-    return None
-
-
-def _request_payload():
-    if request.is_json:
-        return request.get_json(silent=True) or {}
-    return request.form.to_dict()
-
-
-def _bool_value(value):
-    if isinstance(value, bool):
-        return value
-    return str(value).strip().lower() in {'1', 'true', 'yes', 'on', 'aktif'}
 
 
 def _next_month(period):
@@ -395,27 +207,6 @@ def _kwh_sum(*columns):
 
 def _float_value(value):
     return float(value or 0)
-
-
-def _module_access_payload(role=None):
-    role = (role or '').strip().lower()
-    rows = []
-    for item in MODULE_ACCESS_MATRIX:
-        access = item['access']
-        row = {
-            'module': item['module'],
-            'group': item['group'],
-            'access': access,
-        }
-        if role in ROLES:
-            row['role'] = role
-            row['allowed_actions'] = [
-                action
-                for action, roles in access.items()
-                if role in roles
-            ]
-        rows.append(row)
-    return rows
 
 
 def _report_dataset(module):
@@ -797,31 +588,6 @@ def _check_upload_rate():
     ):
         raise ValueError('Terlalu banyak upload dalam waktu singkat. Coba lagi beberapa menit lagi.')
     _record_rate_event(UPLOAD_EVENTS, key, app.config.get('UPLOAD_RATE_WINDOW_MINUTES', 10))
-
-
-def _audit(action, entity_type=None, entity_id=None, detail=None, status='SUCCESS', username=None):
-    user = getattr(g, 'current_user', None)
-    record = AuditLog(
-        user_id=user.id if user else None,
-        username=username or (user.username if user else None),
-        role=user.role if user else None,
-        action=action,
-        entity_type=entity_type,
-        entity_id=str(entity_id) if entity_id is not None else None,
-        status=status,
-        ip_address=_client_ip(),
-        user_agent=(request.headers.get('User-Agent') or '')[:255],
-        detail_json=json.dumps(detail or {}, ensure_ascii=False),
-    )
-    db.session.add(record)
-
-
-def _safe_commit_audit(action, detail=None, status='SUCCESS', username=None):
-    try:
-        _audit(action, detail=detail, status=status, username=username)
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
 
 
 def _extension(filename):
