@@ -1,13 +1,13 @@
-"""Compatibility helpers while routes are migrated out of the monolith."""
+"""Compatibility helpers for routes migrated from the monolith."""
 
 from __future__ import annotations
 
 from flask import Flask
 
 
-def deactivate_legacy_endpoints(app: Flask, *endpoint_names: str) -> None:
-    """Remove legacy endpoint rules after their blueprint replacements exist."""
-    for endpoint_name in endpoint_names:
+def normalize_migrated_routes(app: Flask, *old_endpoint_names: str) -> None:
+    """Keep only blueprint replacements in the active URL map."""
+    for endpoint_name in old_endpoint_names:
         app.view_functions.pop(endpoint_name, None)
         app.url_map._rules_by_endpoint.pop(endpoint_name, None)
 
