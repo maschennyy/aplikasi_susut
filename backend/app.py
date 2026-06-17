@@ -10,15 +10,12 @@ from .models import (db, GarduInduk, Trafo, Penyulang,
                      MeterReading, FeederReading,
                      TransferAntarUnit, RekapBulanan,
                      EximRule, EximMonthlyResult,
-                     User, AuditLog, AreaUnit, MonthlyDataStatus,
+                     User, AuditLog, AreaUnit,
                      KwhJual)
 from .nkwh_excel import analyze_workbook, parse_nkwh_feeders, parse_exim_rows
 from .routes.system import system_bp
 from .routes.auth import auth_bp
-from .routes.dashboard import (
-    dashboard_bp,
-    configure_executive_dashboard,
-)
+from .routes.dashboard import dashboard_bp
 from .routes.export import export_bp
 from .routes.readings import readings_bp
 from .routes.master import master_bp
@@ -156,29 +153,6 @@ MODULE_ACCESS_MATRIX = [
             'self_update': ['viewer', 'auditor', 'operator', 'admin'],
         },
     },
-]
-WORKFLOW_STATUS_ORDER = ['DRAFT', 'SUDAH_UPLOAD', 'SUDAH_DICEK', 'FINAL', 'TERKUNCI']
-WORKFLOW_STATUS_LABELS = {
-    'DRAFT': 'Draft',
-    'SUDAH_UPLOAD': 'Sudah Upload',
-    'SUDAH_DICEK': 'Sudah Dicek',
-    'FINAL': 'Final',
-    'TERKUNCI': 'Terkunci',
-}
-WORKFLOW_TRANSITIONS = {
-    'DRAFT': ['DRAFT', 'SUDAH_UPLOAD'],
-    'SUDAH_UPLOAD': ['DRAFT', 'SUDAH_UPLOAD', 'SUDAH_DICEK'],
-    'SUDAH_DICEK': ['SUDAH_UPLOAD', 'SUDAH_DICEK', 'FINAL'],
-    'FINAL': ['SUDAH_DICEK', 'FINAL', 'TERKUNCI'],
-    'TERKUNCI': ['TERKUNCI', 'FINAL'],
-}
-WORKFLOW_WRITABLE_STATUSES = {'DRAFT', 'SUDAH_UPLOAD'}
-MONTHLY_ACTIVITY_ACTIONS = [
-    'ANALYZE_NKWH',
-    'IMPORT_NKWH',
-    'IMPORT_PENYULANG',
-    'MARK_MONTH_UPLOADED',
-    'UPDATE_MONTHLY_STATUS',
 ]
 KWH_JUAL_GROUP_LABELS = {
     'S': 'Sosial',
@@ -384,271 +358,6 @@ def _bool_value(value):
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in {'1', 'true', 'yes', 'on', 'aktif'}
-
-
-def _normalize_workflow_status(value):
-    raw = str(value or '').strip().upper().replace('-', '_').replace(' ', '_')
-    compact = raw.replace('_', '')
-    aliases = {
-        'DRAFT': 'DRAFT',
-        'SUDAHUPLOAD': 'SUDAH_UPLOAD',
-        'UPLOAD': 'SUDAH_UPLOAD',
-        'SUDAHDICEK': 'SUDAH_DICEK',
-        'DICEK': 'SUDAH_DICEK',
-        'CHECKED': 'SUDAH_DICEK',
-        'FINAL': 'FINAL',
-        'TERKUNCI': 'TERKUNCI',
-        'LOCKED': 'TERKUNCI',
-    }
-    status = aliases.get(compact, raw)
-    if status not in WORKFLOW_STATUS_ORDER:
-        raise ValueError('Status workflow tidak dikenali.')
-    return status
-
-
-def _workflow_period(value):
-    try:
-        return _month_date(value)
-    except ValueError:
-        raise ValueError('Format periode harus YYYY-MM.')
-
-
-def _workflow_record(period, create=False):
-    record = MonthlyDataStatus.query.filter_by(periode_bulan=period).first()
-    if not record and create:
-        record = MonthlyDataStatus(periode_bulan=period, status='DRAFT')
-        db.session.add(record)
-        db.session.flush()
-    return record
-
-
-def _workflow_allowed_statuses(status, user=None):
-    allowed = list(WORKFLOW_TRANSITIONS.get(status, ['DRAFT']))
-    if status == 'TERKUNCI' and (not user or user.role != 'admin'):
-        return ['TERKUNCI']
-    if 'TERKUNCI' in allowed and (not user or user.role != 'admin'):
-        allowed.remove('TERKUNCI')
-    return allowed
-
-
-def _workflow_payload(period, record=None):
-    record = record if record is not None else _workflow_record(period)
-    status = _normalize_workflow_status(record.status) if record else 'DRAFT'
-    current_index = WORKFLOW_STATUS_ORDER.index(status)
-    user = getattr(g, 'current_user', None)
-    allowed = _workflow_allowed_statuses(status, user)
-    return {
-        'id': record.id if record else None,
-        'periode': period.strftime('%Y-%m'),
-        'periode_bulan': period.strftime('%Y-%m-%d'),
-        'status': status,
-        'label': WORKFLOW_STATUS_LABELS[status],
-        'catatan': record.catatan if record else '',
-        'locked': status == 'TERKUNCI',
-        'writable': status in WORKFLOW_WRITABLE_STATUSES,
-        'locked_at': record.locked_at.isoformat() if record and record.locked_at else None,
-        'locked_by': record.locked_by if record else None,
-        'updated_at': record.updated_at.isoformat() if record and record.updated_at else None,
-        'allowed_next': [
-            {'status': code, 'label': WORKFLOW_STATUS_LABELS[code]}
-            for code in allowed
-        ],
-        'steps': [
-            {
-                'status': code,
-                'label': WORKFLOW_STATUS_LABELS[code],
-                'done': index < current_index,
-                'active': code == status,
-                'locked': code == 'TERKUNCI',
-            }
-            for index, code in enumerate(WORKFLOW_STATUS_ORDER)
-        ],
-    }
-
-
-def _ensure_period_writable(period):
-    record = _workflow_record(period)
-    if not record:
-        return
-    status = _normalize_workflow_status(record.status)
-    if status not in WORKFLOW_WRITABLE_STATUSES:
-        label = WORKFLOW_STATUS_LABELS[status]
-        raise ValueError(
-            f'Periode {period.strftime("%Y-%m")} berstatus {label}. '
-            'Turunkan status ke Draft/Sudah Upload sebelum import ulang.'
-        )
-
-
-def _mark_period_uploaded(period, source, filename=None):
-    record = _workflow_record(period, create=True)
-    status = _normalize_workflow_status(record.status)
-    if status == 'DRAFT':
-        record.status = 'SUDAH_UPLOAD'
-    if not record.catatan:
-        record.catatan = f'Upload terakhir dari {source}.'
-    record.locked_at = None if record.status != 'TERKUNCI' else record.locked_at
-    record.locked_by = None if record.status != 'TERKUNCI' else record.locked_by
-    _audit('MARK_MONTH_UPLOADED', entity_type='monthly_data_status', entity_id=record.id, detail={
-        'periode_bulan': period.strftime('%Y-%m-%d'),
-        'source': source,
-        'filename': filename,
-        'status': record.status,
-    })
-    return record
-
-
-def _audit_detail(record):
-    try:
-        return json.loads(record.detail_json or '{}')
-    except (TypeError, ValueError):
-        return {}
-
-
-def _audit_month_summary(detail):
-    labels = {
-        'filename': 'File',
-        'source': 'Sumber',
-        'from_status': 'Dari',
-        'to_status': 'Ke',
-        'created': 'Baru',
-        'updated': 'Update',
-        'alerts': 'Alert',
-        'error_count': 'Error',
-        'feeder_count': 'Penyulang',
-        'gi_count': 'GI',
-    }
-    parts = []
-    for key, label in labels.items():
-        value = detail.get(key)
-        if value in (None, '', []):
-            continue
-        parts.append(f'{label}: {value}')
-    return '; '.join(parts) or '-'
-
-
-def _monthly_activity_payload(period, limit=30):
-    period_day = period.strftime('%Y-%m-%d')
-    period_month = period.strftime('%Y-%m')
-    rows = AuditLog.query.filter(AuditLog.action.in_(MONTHLY_ACTIVITY_ACTIONS)).filter(
-        (AuditLog.detail_json.contains(period_day)) |
-        (AuditLog.detail_json.contains(period_month))
-    ).order_by(AuditLog.created_at.desc()).limit(limit).all()
-    activities = []
-    for row in rows:
-        detail = _audit_detail(row)
-        activities.append({
-            'id': row.id,
-            'created_at': row.created_at.isoformat() if row.created_at else None,
-            'username': row.username or '-',
-            'role': row.role or '-',
-            'action': row.action,
-            'status': row.status,
-            'summary': _audit_month_summary(detail),
-            'detail': detail,
-        })
-    return {
-        'periode': period_month,
-        'periode_bulan': period_day,
-        'rows': activities,
-    }
-
-
-def _readiness_status(value, expected=None, optional=False):
-    if expected and expected > 0:
-        ratio = min(float(value or 0) / float(expected), 1)
-    else:
-        ratio = 1 if value else 0
-    if ratio >= .98:
-        return 'ready', ratio
-    if ratio > 0:
-        return 'partial', ratio
-    return ('optional' if optional else 'empty'), ratio
-
-
-def _readiness_item(code, label, value, expected=None, optional=False, detail=''):
-    status, ratio = _readiness_status(value, expected, optional)
-    if expected and expected > 0:
-        subtitle = f'{int(value or 0)} dari {int(expected)}'
-    else:
-        subtitle = f'{int(value or 0)} data'
-    return {
-        'code': code,
-        'label': label,
-        'value': int(value or 0),
-        'expected': int(expected) if expected is not None else None,
-        'ratio': round(ratio, 4),
-        'percent': round(ratio * 100),
-        'status': status,
-        'optional': optional,
-        'subtitle': subtitle,
-        'detail': detail,
-    }
-
-
-def _readiness_payload(period):
-    active_gi = GarduInduk.query.filter_by(aktif=True).count()
-    active_trafo = Trafo.query.filter_by(aktif=True).count()
-    active_feeders = Penyulang.query.filter_by(aktif=True).count()
-
-    feeder_rows = FeederReading.query.filter_by(periode_bulan=period).count()
-    feeder_unique = db.session.query(func.count(func.distinct(FeederReading.penyulang_id))).filter(
-        FeederReading.periode_bulan == period
-    ).scalar() or 0
-    alert_count = FeederReading.query.filter_by(
-        periode_bulan=period,
-        flag_alert=True,
-    ).count()
-
-    mu_total_expr = (
-        func.coalesce(MeterReading.mu_kwh_wbp, 0) +
-        func.coalesce(MeterReading.mu_kwh_lwbp1, 0) +
-        func.coalesce(MeterReading.mu_kwh_lwbp2, 0)
-    )
-    mp_total_expr = (
-        func.coalesce(MeterReading.mp_kwh_wbp, 0) +
-        func.coalesce(MeterReading.mp_kwh_lwbp1, 0) +
-        func.coalesce(MeterReading.mp_kwh_lwbp2, 0)
-    )
-    mu_count = MeterReading.query.filter(
-        MeterReading.periode_bulan == period,
-        mu_total_expr > 0,
-    ).count()
-    mp_count = MeterReading.query.filter(
-        MeterReading.periode_bulan == period,
-        mp_total_expr > 0,
-    ).count()
-    exim_count = EximMonthlyResult.query.filter_by(periode_bulan=period).count()
-    transfer_count = TransferAntarUnit.query.filter_by(periode_bulan=period).count()
-    rekap_count = RekapBulanan.query.filter_by(periode_bulan=period).count()
-
-    items = [
-        _readiness_item('master_gi', 'Master GI', active_gi, detail='gardu induk aktif'),
-        _readiness_item('master_trafo', 'Master Trafo', active_trafo, detail='trafo aktif'),
-        _readiness_item('master_penyulang', 'Master Penyulang', active_feeders, detail='penyulang aktif'),
-        _readiness_item('feeder_reading', 'kWh Penyulang', feeder_unique, active_feeders, detail=f'{feeder_rows} baris pembacaan'),
-        _readiness_item('meter_utama', 'kWh Utama', mu_count, active_trafo, detail='trafo punya meter utama'),
-        _readiness_item('meter_pembanding', 'kWh Pembanding', mp_count, active_trafo, detail='trafo punya meter pembanding'),
-        _readiness_item('exim', 'Transfer EXIM', exim_count, optional=True, detail='snapshot transfer EXIM'),
-        _readiness_item('transfer_uid', 'Transfer Antar UID', transfer_count, optional=True, detail='transaksi antar UID'),
-        _readiness_item('rekap', 'Rekap Bulanan', rekap_count, optional=True, detail='snapshot rekap'),
-    ]
-    required = [item for item in items if not item['optional']]
-    score = round(sum(item['ratio'] for item in required) / len(required) * 100) if required else 0
-    blockers = [
-        item['label']
-        for item in required
-        if item['status'] in {'empty', 'partial'}
-    ]
-    return {
-        'periode': period.strftime('%Y-%m'),
-        'periode_bulan': period.strftime('%Y-%m-%d'),
-        'score': score,
-        'status': 'ready' if not blockers else 'partial' if score else 'empty',
-        'can_finalize': not blockers,
-        'blockers': blockers,
-        'alert_count': alert_count,
-        'items': items,
-    }
 
 
 def _next_month(period):
@@ -1220,12 +929,6 @@ def _decimal_payload(value, default='0'):
     if value in (None, ''):
         return Decimal(default)
     return Decimal(str(value))
-
-
-configure_executive_dashboard(
-    readiness_provider=_readiness_payload,
-    workflow_provider=_workflow_payload,
-)
 
 
 # ════════════════════════════════════════════════
