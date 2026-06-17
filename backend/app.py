@@ -14,7 +14,10 @@ from models import (db, GarduInduk, Trafo, Penyulang,
                     KwhJual)
 from nkwh_excel import analyze_workbook, parse_nkwh_feeders, parse_exim_rows
 from .routes.system import system_bp
-from .routes.dashboard import dashboard_bp
+from .routes.dashboard import (
+    dashboard_bp,
+    configure_executive_dashboard,
+)
 from .routes.master import master_bp
 from .routes.penyulang_area import register_penyulang_area_route
 from sqlalchemy import func, text, inspect
@@ -1447,6 +1450,12 @@ def _decimal_payload(value, default='0'):
     return Decimal(str(value))
 
 
+configure_executive_dashboard(
+    readiness_provider=_readiness_payload,
+    workflow_provider=_workflow_payload,
+)
+
+
 # ════════════════════════════════════════════════
 # API — DASHBOARD
 # ════════════════════════════════════════════════
@@ -1454,110 +1463,6 @@ def _decimal_payload(value, default='0'):
 # ════════════════════════════════════════════════
 # API — FEEDER, METER, TRANSFER, REKAP
 # ════════════════════════════════════════════════
-
-@app.route('/api/executive-dashboard')
-def api_executive_dashboard():
-    try:
-        tahun = request.args.get('tahun', type=int) or date.today().year
-        month = request.args.get('month', type=int) or date.today().month
-        if month < 1 or month > 12:
-            return jsonify({'error': 'Bulan tidak valid.'}), 400
-        period = date(tahun, month, 1)
-
-        mu_expr = _kwh_sum(MeterReading, MeterReading.mu_kwh_wbp, MeterReading.mu_kwh_lwbp1, MeterReading.mu_kwh_lwbp2)
-        feeder_expr = _kwh_sum(FeederReading, FeederReading.kwh_wbp, FeederReading.kwh_lwbp1, FeederReading.kwh_lwbp2)
-
-        total_masuk = _float_value(
-            db.session.query(func.sum(mu_expr))
-            .filter(MeterReading.periode_bulan == period)
-            .scalar()
-        )
-        total_keluar = _float_value(
-            db.session.query(func.sum(feeder_expr))
-            .filter(FeederReading.periode_bulan == period)
-            .scalar()
-        )
-        susut = total_masuk - total_keluar
-        susut_pct = (susut / total_masuk * 100) if total_masuk else 0
-
-        mu_rows = db.session.query(
-            MeterReading.gi_id,
-            func.sum(mu_expr).label('total_mu'),
-        ).filter(
-            MeterReading.periode_bulan == period,
-        ).group_by(MeterReading.gi_id).all()
-        feeder_rows = db.session.query(
-            FeederReading.gi_id,
-            func.sum(feeder_expr).label('total_feeder'),
-        ).filter(
-            FeederReading.periode_bulan == period,
-        ).group_by(FeederReading.gi_id).all()
-        gi_names = {
-            gi.id: gi.nama_gi
-            for gi in GarduInduk.query.filter_by(aktif=True).all()
-        }
-        mu_by_gi = {row.gi_id: _float_value(row.total_mu) for row in mu_rows}
-        feeder_by_gi = {row.gi_id: _float_value(row.total_feeder) for row in feeder_rows}
-        gi_deviasi = []
-        for gi_id in sorted(set(mu_by_gi) | set(feeder_by_gi)):
-            mu = mu_by_gi.get(gi_id, 0)
-            feeder = feeder_by_gi.get(gi_id, 0)
-            gap = mu - feeder
-            gi_deviasi.append({
-                'gi_id': gi_id,
-                'nama_gi': gi_names.get(gi_id, f'GI #{gi_id}'),
-                'meter_utama': round(mu, 2),
-                'penyulang': round(feeder, 2),
-                'deviasi_kwh': round(gap, 2),
-                'deviasi_persen': round((gap / mu * 100) if mu else 0, 2),
-            })
-        gi_deviasi.sort(key=lambda row: abs(row['deviasi_persen']), reverse=True)
-
-        anomaly_rows = db.session.query(
-            FeederReading, Penyulang, Trafo, GarduInduk
-        ).join(
-            Penyulang, FeederReading.penyulang_id == Penyulang.id
-        ).join(
-            Trafo, FeederReading.trafo_id == Trafo.id
-        ).join(
-            GarduInduk, FeederReading.gi_id == GarduInduk.id
-        ).filter(
-            FeederReading.periode_bulan == period
-        ).all()
-        anomalies = []
-        for reading, penyulang, trafo, gi in anomaly_rows:
-            pct = _float_value(reading.deviasi_persen)
-            if not reading.flag_alert and abs(pct) < 20:
-                continue
-            anomalies.append({
-                'penyulang': penyulang.nama_penyulang,
-                'kode_penyulang': penyulang.kode_penyulang,
-                'gardu_induk': gi.nama_gi,
-                'trafo': trafo.kode_trafo,
-                'area_up3': penyulang.area_up3 or 'Belum Dipetakan',
-                'kwh_total': round(reading.kwh_total, 2),
-                'deviasi_persen': round(pct, 2),
-                'anomaly_type': reading.anomaly_type or ('Naik/Turun Tidak Wajar' if reading.flag_alert else 'Deviasi Tinggi'),
-            })
-        anomalies.sort(key=lambda row: abs(row['deviasi_persen']), reverse=True)
-
-        readiness = _readiness_payload(period)
-        workflow = _workflow_payload(period)
-        return jsonify({
-            'periode': period.strftime('%Y-%m'),
-            'periode_bulan': period.strftime('%Y-%m-%d'),
-            'total_kwh_masuk': round(total_masuk, 2),
-            'total_kwh_keluar': round(total_keluar, 2),
-            'susut_kwh': round(susut, 2),
-            'susut_persen': round(susut_pct, 2),
-            'gi_deviasi_terbesar': gi_deviasi[:5],
-            'penyulang_anomali': anomalies[:8],
-            'readiness': readiness,
-            'workflow': workflow,
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 
 @app.route('/api/feeder-data')
 def api_feeder_data():

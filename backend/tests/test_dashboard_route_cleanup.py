@@ -8,19 +8,25 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 
 class DashboardRouteCleanupTest(unittest.TestCase):
-    def test_dashboard_data_route_is_not_in_app_monolith(self):
+    def test_dashboard_routes_are_not_in_app_monolith(self):
         source = (BACKEND_DIR / "app.py").read_text(encoding="utf-8")
         self.assertNotIn("@app.route('/api/dashboard-data')", source)
-        self.assertIn("@app.route('/api/executive-dashboard')", source)
+        self.assertNotIn("@app.route('/api/executive-dashboard')", source)
+        self.assertIn("@app.route('/api/feeder-data')", source)
 
-    def test_dashboard_data_route_is_registered_once(self):
-        rules = [
-            rule
-            for rule in app.url_map.iter_rules()
-            if rule.rule == "/api/dashboard-data"
-        ]
-        self.assertEqual(len(rules), 1)
-        self.assertEqual(rules[0].endpoint, "dashboard.api_dashboard_data")
+    def test_dashboard_routes_are_registered_once(self):
+        expected = {
+            "/api/dashboard-data": "dashboard.api_dashboard_data",
+            "/api/executive-dashboard": "dashboard.api_executive_dashboard",
+        }
+        for path, endpoint in expected.items():
+            rules = [
+                rule
+                for rule in app.url_map.iter_rules()
+                if rule.rule == path
+            ]
+            self.assertEqual(len(rules), 1, path)
+            self.assertEqual(rules[0].endpoint, endpoint)
 
 
 if __name__ == "__main__":
