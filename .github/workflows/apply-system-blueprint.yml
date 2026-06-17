@@ -7,6 +7,12 @@ on:
     paths:
       - ".github/workflows/apply-system-blueprint.yml"
       - "scripts/apply_system_blueprint_refactor.py"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/apply-system-blueprint.yml"
+      - "scripts/apply_system_blueprint_refactor.py"
 
 permissions:
   contents: write
