@@ -13,6 +13,7 @@ from models import (db, GarduInduk, Trafo, Penyulang,
                     User, AuditLog, AreaUnit, MonthlyDataStatus,
                     KwhJual)
 from nkwh_excel import analyze_workbook, parse_nkwh_feeders, parse_exim_rows
+from .routes.system import system_bp
 from sqlalchemy import func, text, inspect
 from sqlalchemy import and_
 from collections import defaultdict, deque
@@ -44,6 +45,8 @@ migrate = Migrate(
     compare_type=True,
     render_as_batch=True,
 )
+
+app.register_blueprint(system_bp)
 
 # ════════════════════════════════════════════════
 # KONFIGURASI SECURITY, ROLE, DAN WORKFLOW
@@ -1247,35 +1250,6 @@ def logout():
 @app.route('/api/csrf-token')
 def api_csrf_token():
     return jsonify({'csrf_token': csrf_token()})
-
-
-# ════════════════════════════════════════════════
-# API — SIDEBAR STATS
-# ════════════════════════════════════════════════
-
-@app.route('/api/sidebar-stats')
-def api_sidebar_stats():
-    """
-    Data mini stats sidebar: jumlah GI aktif dan jumlah alert.
-    Ringan — tidak join banyak tabel.
-    """
-    try:
-        gi_aktif = GarduInduk.query.filter_by(aktif=True).count()
-
-        # Alert = FeederReading dengan flag_alert=True bulan ini
-        from datetime import date
-        bulan_ini = date.today().replace(day=1)
-        alert_count = FeederReading.query.filter_by(
-            flag_alert=True,
-            periode_bulan=bulan_ini
-        ).count()
-
-        return jsonify({
-            'gi_aktif':    gi_aktif,
-            'alert_count': alert_count
-        })
-    except Exception as e:
-        return jsonify({'gi_aktif': 0, 'alert_count': 0, 'error': str(e)})
 
 
 # ════════════════════════════════════════════════
