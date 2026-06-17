@@ -7,6 +7,12 @@ on:
     paths:
       - ".github/workflows/apply-master-route-extraction.yml"
       - "scripts/cleanup_master_routes.py"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/apply-master-route-extraction.yml"
+      - "scripts/cleanup_master_routes.py"
 
 permissions:
   contents: write
