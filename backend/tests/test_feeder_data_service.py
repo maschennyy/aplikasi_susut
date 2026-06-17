@@ -53,7 +53,6 @@ class FeederDataServiceTest(unittest.TestCase):
                 jenis="REGULAR",
                 area_up3="UP3 A",
                 ex_cabang="EX-A",
-                status=None,
                 aktif=False,
             )
             feeder_b = Penyulang(
@@ -68,6 +67,8 @@ class FeederDataServiceTest(unittest.TestCase):
             )
             db.session.add_all([feeder_a, feeder_b])
             db.session.flush()
+            feeder_a.status = None
+            feeder_a.aktif = False
 
             db.session.add_all([
                 FeederReading(
