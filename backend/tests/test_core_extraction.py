@@ -44,6 +44,21 @@ class CoreExtractionTest(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertNotIn(marker, source)
 
+    def test_auth_route_no_longer_uses_app_bridge(self):
+        source = (BACKEND_DIR / "routes" / "auth.py").read_text(encoding="utf-8")
+
+        forbidden_markers = [
+            "from ._app_bridge import core",
+            "app_module._validate_csrf",
+            "app_module.LOGIN_FAILURES",
+            "app_module._login_user",
+            "app_module._logout_user",
+            "core().csrf_token()",
+        ]
+        for marker in forbidden_markers:
+            with self.subTest(marker=marker):
+                self.assertNotIn(marker, source)
+
 
 if __name__ == "__main__":
     unittest.main()
