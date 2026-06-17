@@ -1,0 +1,72 @@
+diff --git a/backend/app.py b/backend/app.py
+--- a/backend/app.py
++++ b/backend/app.py
+@@ -1446,63 +1446,6 @@ def _decimal_payload(value, default='0'):
+     return Decimal(str(value))
+ 
+ 
+-@app.route('/api/area-unit', methods=['GET', 'POST'])
+-def api_area_unit():
+-    try:
+-        if request.method == 'POST':
+-            denied = _master_writer_required()
+-            if denied:
+-                return denied
+-            payload = _request_payload()
+-            kode = _clean_value(payload.get('kode_unit')).upper()
+-            nama = _clean_value(payload.get('nama_unit'))
+-            if not kode or not nama:
+-                return _json_error('Kode unit dan nama unit wajib diisi.', 400)
+-            if AreaUnit.query.filter_by(kode_unit=kode).first():
+-                return _json_error('Kode unit sudah terdaftar.', 409)
+-            unit = AreaUnit(
+-                kode_unit=kode,
+-                nama_unit=nama,
+-                jenis=_clean_value(payload.get('jenis'), 'UP3').upper(),
+-                parent_unit=_clean_value(payload.get('parent_unit')) or None,
+-                aktif=_bool_value(payload.get('aktif', True)),
+-            )
+-            db.session.add(unit)
+-            _audit('CREATE_AREA_UNIT', entity_type='area_unit', detail={'kode_unit': kode})
+-            db.session.commit()
+-            return jsonify(unit.to_dict()), 201
+-
+-        q = AreaUnit.query
+-        if request.args.get('all') != '1':
+-            q = q.filter_by(aktif=True)
+-        return jsonify([u.to_dict() for u in q.order_by(AreaUnit.jenis, AreaUnit.nama_unit).all()])
+-    except Exception as e:
+-        db.session.rollback()
+-        return jsonify({'error': str(e)}), 500
+-
+-
+-@app.route('/api/area-unit/<int:unit_id>', methods=['PATCH', 'POST'])
+-def api_area_unit_update(unit_id):
+-    denied = _master_writer_required()
+-    if denied:
+-        return denied
+-    unit = db.session.get(AreaUnit, unit_id)
+-    if not unit:
+-        return _json_error('Area/unit tidak ditemukan.', 404)
+-    payload = _request_payload()
+-    kode = _clean_value(payload.get('kode_unit'), unit.kode_unit).upper()
+-    nama = _clean_value(payload.get('nama_unit'), unit.nama_unit)
+-    existing = AreaUnit.query.filter(AreaUnit.kode_unit == kode, AreaUnit.id != unit.id).first()
+-    if existing:
+-        return _json_error('Kode unit sudah dipakai area/unit lain.', 409)
+-    before = unit.to_dict()
+-    unit.kode_unit = kode
+-    unit.nama_unit = nama
+-    unit.jenis = _clean_value(payload.get('jenis'), unit.jenis).upper()
+-    unit.parent_unit = _clean_value(payload.get('parent_unit')) or None
+-    unit.aktif = _bool_value(payload.get('aktif', unit.aktif))
+-    _audit('UPDATE_AREA_UNIT', entity_type='area_unit', entity_id=unit.id, detail={
+-        'before': before,
+-        'after': unit.to_dict(),
+-    })
+-    db.session.commit()
+-    return jsonify(unit.to_dict())
+-
+-
+ @app.route('/api/gardu-induk', methods=['GET', 'POST'])
+ def api_gardu_induk():
