@@ -32,6 +32,8 @@ normalize_migrated_routes(
     "api_gardu_induk_update",
     "api_trafo",
     "api_trafo_update",
+    "api_penyulang_list",
+    "api_penyulang_update",
 )
 register_migration_commands(app, db)
 
