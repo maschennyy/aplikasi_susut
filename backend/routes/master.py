@@ -1,4 +1,4 @@
-"""Master-data API routes."""
+"""Master data API routes."""
 
 from flask import Blueprint, jsonify
 
@@ -10,7 +10,7 @@ master_bp = Blueprint("master", __name__)
 
 @master_bp.get("/api/master-data/summary")
 def api_master_summary():
-    """Return master-data totals and mapping gaps."""
+    """Return active master totals and incomplete mapping counts."""
     try:
         return jsonify(get_master_data_summary())
     except Exception as exc:
