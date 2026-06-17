@@ -1,0 +1,46 @@
+name: Apply Penyulang area route
+
+on:
+  push:
+    branches:
+      - feature-penyulang-area-blueprint
+    paths:
+      - ".github/workflows/apply-penyulang-area-route.yml"
+      - "scripts/move_penyulang_area_route.py"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/apply-penyulang-area-route.yml"
+      - "scripts/move_penyulang_area_route.py"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature-penyulang-area-blueprint
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r backend/requirements.txt
+      - run: python scripts/move_penyulang_area_route.py
+      - run: python -m unittest discover -s backend/tests -t . -v
+
+      - name: Save route migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/app.py
+          git commit -m "refactor: move penyulang area to master blueprint"
+          git push origin HEAD:feature-penyulang-area-blueprint
