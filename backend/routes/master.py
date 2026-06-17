@@ -167,3 +167,14 @@ def api_trafo_update(trafo_id: int):
     except Exception as exc:
         db.session.rollback()
         return jsonify({"error": str(exc)}), 500
+
+
+from .penyulang import register_penyulang_routes
+
+register_penyulang_routes(
+    master_bp,
+    writer_denied=_master_writer_denied,
+    request_payload=_request_payload,
+    audit_actor=_audit_actor,
+    json_error=_json_error,
+)
