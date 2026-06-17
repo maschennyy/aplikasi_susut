@@ -18,6 +18,7 @@ from .routes.dashboard import (
     dashboard_bp,
     configure_executive_dashboard,
 )
+from .routes.readings import readings_bp
 from .routes.master import master_bp
 from .routes.penyulang_area import register_penyulang_area_route
 from sqlalchemy import func, text, inspect
@@ -54,6 +55,7 @@ migrate = Migrate(
 
 app.register_blueprint(system_bp)
 app.register_blueprint(dashboard_bp)
+app.register_blueprint(readings_bp)
 register_penyulang_area_route(master_bp)
 app.register_blueprint(master_bp)
 
@@ -1463,45 +1465,6 @@ configure_executive_dashboard(
 # ════════════════════════════════════════════════
 # API — FEEDER, METER, TRANSFER, REKAP
 # ════════════════════════════════════════════════
-
-@app.route('/api/feeder-data')
-def api_feeder_data():
-    try:
-        gi_id    = request.args.get('gi_id',    type=int)
-        trafo_id = request.args.get('trafo_id', type=int)
-        bulan    = request.args.get('bulan', '').strip()
-        
-        q = db.session.query(FeederReading, Penyulang)\
-              .join(Penyulang, FeederReading.penyulang_id == Penyulang.id)
-        if gi_id:    q = q.filter(FeederReading.gi_id    == gi_id)
-        if trafo_id: q = q.filter(FeederReading.trafo_id == trafo_id)
-        if bulan:
-            try:
-                thn, bln = bulan.split('-')
-                thn, bln = int(thn), int(bln)
-                if not (1 <= bln <= 12) or thn < 2000 or thn > 2100:
-                    return jsonify({'error': 'Invalid date format'}), 400
-                q = q.filter(
-                    func.extract('year',  FeederReading.periode_bulan) == thn,
-                    func.extract('month', FeederReading.periode_bulan) == bln
-                )
-            except (ValueError, AttributeError):
-                return jsonify({'error': 'Format bulan harus YYYY-MM'}), 400
-        
-        result = []
-        for fr, py in q.order_by(Penyulang.kode_penyulang).all():
-            d = fr.to_dict()
-            d['kode_penyulang'] = py.kode_penyulang
-            d['nama_penyulang'] = py.nama_penyulang
-            d['jenis'] = py.jenis
-            d['area_up3'] = py.area_up3
-            d['ex_cabang'] = py.ex_cabang
-            d['status'] = py.status or ('AKTIF' if py.aktif else 'NONAKTIF')
-            result.append(d)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 
 @app.route('/api/meter-data')
 def api_meter_data():
