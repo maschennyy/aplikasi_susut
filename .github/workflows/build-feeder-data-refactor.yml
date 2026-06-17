@@ -1,0 +1,24 @@
+name: Build feeder data refactor
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: readings-feeder-data-blueprint
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r backend/requirements.txt
+      - run: python scripts/refactor_feeder_data.py
+      - run: python -m unittest discover -s backend/tests -t . -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: patched-app
+          path: backend/app.py
