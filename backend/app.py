@@ -14,6 +14,7 @@ from models import (db, GarduInduk, Trafo, Penyulang,
                     KwhJual)
 from nkwh_excel import analyze_workbook, parse_nkwh_feeders, parse_exim_rows
 from .routes.system import system_bp
+from .routes.master import master_bp
 from sqlalchemy import func, text, inspect
 from sqlalchemy import and_
 from collections import defaultdict, deque
@@ -47,6 +48,7 @@ migrate = Migrate(
 )
 
 app.register_blueprint(system_bp)
+app.register_blueprint(master_bp)
 
 # ════════════════════════════════════════════════
 # KONFIGURASI SECURITY, ROLE, DAN WORKFLOW
@@ -1439,29 +1441,6 @@ def _decimal_payload(value, default='0'):
     if value in (None, ''):
         return Decimal(default)
     return Decimal(str(value))
-
-
-@app.route('/api/master-data/summary')
-def api_master_summary():
-    try:
-        active_gi = GarduInduk.query.filter_by(aktif=True).count()
-        active_trafo = Trafo.query.filter_by(aktif=True).count()
-        active_penyulang = Penyulang.query.filter_by(aktif=True).count()
-        active_area = AreaUnit.query.filter_by(aktif=True).count()
-        missing_area = Penyulang.query.filter(Penyulang.aktif.is_(True)).filter(
-            (Penyulang.area_up3.is_(None)) | (Penyulang.area_up3 == '')
-        ).count()
-        trafo_without_feeder = sum(1 for trafo in Trafo.query.filter_by(aktif=True).all() if not trafo.penyulangs)
-        return jsonify({
-            'gi': active_gi,
-            'trafo': active_trafo,
-            'penyulang': active_penyulang,
-            'area_unit': active_area,
-            'missing_area': missing_area,
-            'trafo_without_feeder': trafo_without_feeder,
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/area-unit', methods=['GET', 'POST'])
