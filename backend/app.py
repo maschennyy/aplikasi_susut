@@ -14,6 +14,7 @@ from models import (db, GarduInduk, Trafo, Penyulang,
                     KwhJual)
 from nkwh_excel import analyze_workbook, parse_nkwh_feeders, parse_exim_rows
 from .routes.system import system_bp
+from .routes.dashboard import dashboard_bp
 from .routes.master import master_bp
 from .routes.penyulang_area import register_penyulang_area_route
 from sqlalchemy import func, text, inspect
@@ -49,6 +50,7 @@ migrate = Migrate(
 )
 
 app.register_blueprint(system_bp)
+app.register_blueprint(dashboard_bp)
 register_penyulang_area_route(master_bp)
 app.register_blueprint(master_bp)
 
@@ -1448,76 +1450,6 @@ def _decimal_payload(value, default='0'):
 # ════════════════════════════════════════════════
 # API — DASHBOARD
 # ════════════════════════════════════════════════
-
-@app.route('/api/dashboard-data')
-def get_dashboard_data():
-    try:
-        tahun = request.args.get('tahun', type=int)
-
-        sub_mu = db.session.query(
-            MeterReading.periode_bulan,
-            func.sum(
-                func.coalesce(MeterReading.mu_kwh_wbp,   0) +
-                func.coalesce(MeterReading.mu_kwh_lwbp1, 0) +
-                func.coalesce(MeterReading.mu_kwh_lwbp2, 0)
-            ).label('total_mu')
-        ).group_by(MeterReading.periode_bulan)
-
-        sub_py = db.session.query(
-            FeederReading.periode_bulan,
-            func.sum(
-                func.coalesce(FeederReading.kwh_wbp,   0) +
-                func.coalesce(FeederReading.kwh_lwbp1, 0) +
-                func.coalesce(FeederReading.kwh_lwbp2, 0)
-            ).label('total_penyulang')
-        ).group_by(FeederReading.periode_bulan)
-
-        if tahun:
-            sub_mu = sub_mu.filter(func.extract('year', MeterReading.periode_bulan) == tahun)
-            sub_py = sub_py.filter(func.extract('year', FeederReading.periode_bulan) == tahun)
-
-        sub_mu = sub_mu.subquery()
-        sub_py = sub_py.subquery()
-
-        rows = db.session.query(
-            sub_mu.c.periode_bulan,
-            sub_mu.c.total_mu,
-            func.coalesce(sub_py.c.total_penyulang, 0).label('total_penyulang')
-        ).outerjoin(
-            sub_py, sub_mu.c.periode_bulan == sub_py.c.periode_bulan
-        ).order_by(sub_mu.c.periode_bulan).all()
-
-        data = []
-        t_mu = t_py = 0
-        for r in rows:
-            mu  = float(r.total_mu)
-            py  = float(r.total_penyulang)
-            sk  = mu - py
-            pct = round(sk / mu * 100, 2) if mu > 0 else 0
-            t_mu += mu; t_py += py
-            data.append({
-                'tanggal':          r.periode_bulan.strftime('%Y-%m-%d'),
-                'meter_utama':      mu,
-                'total_penyulang':  py,
-                'susut_kwh':        round(sk, 2),
-                'persentase_susut': pct,
-            })
-
-        t_sk  = t_mu - t_py
-        t_pct = round(t_sk / t_mu * 100, 2) if t_mu > 0 else 0
-        return jsonify({
-            'data_bulanan': data,
-            'total': {
-                'meter_utama':      t_mu,
-                'total_penyulang':  t_py,
-                'total_susut':      round(t_sk, 2),
-                'persentase_total': t_pct,
-            }
-        })
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 
 # ════════════════════════════════════════════════
 # API — FEEDER, METER, TRANSFER, REKAP
