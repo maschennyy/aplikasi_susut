@@ -7,6 +7,8 @@ service extraction pass.
 
 from flask import abort, g
 
+from ..core.security import json_error
+
 
 def core():
     from .. import app as app_module
@@ -15,10 +17,9 @@ def core():
 
 
 def require_roles(*roles):
-    app_module = core()
     user = getattr(g, "current_user", None)
     if not user:
-        return app_module._json_error("Login diperlukan.", 401)
+        return json_error("Login diperlukan.", 401)
     if user.role not in roles:
         abort(403)
     return None
