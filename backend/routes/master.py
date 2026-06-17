@@ -10,6 +10,12 @@ from ..services.area_unit import (
     update_area_unit,
 )
 from ..services.audit_log import AuditActor
+from ..services.gardu_induk import (
+    GarduIndukServiceError,
+    create_gardu_induk,
+    list_gardu_induk,
+    update_gardu_induk,
+)
 from ..services.master_summary import get_master_data_summary
 
 
@@ -97,6 +103,45 @@ def api_area_unit_update(unit_id: int):
         )
         return jsonify(result)
     except AreaUnitServiceError as exc:
+        return _json_error(str(exc), exc.status_code)
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 500
+
+
+@master_bp.route("/api/gardu-induk", methods=["GET", "POST"])
+def api_gardu_induk():
+    try:
+        if request.method == "POST":
+            denied = _master_writer_denied()
+            if denied:
+                return denied
+            result = create_gardu_induk(_request_payload(), _audit_actor())
+            return jsonify(result), 201
+
+        include_inactive = request.args.get("all") == "1"
+        return jsonify(list_gardu_induk(include_inactive=include_inactive))
+    except GarduIndukServiceError as exc:
+        return _json_error(str(exc), exc.status_code)
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 500
+
+
+@master_bp.route("/api/gardu-induk/<int:gi_id>", methods=["PATCH", "POST"])
+def api_gardu_induk_update(gi_id: int):
+    denied = _master_writer_denied()
+    if denied:
+        return denied
+
+    try:
+        result = update_gardu_induk(
+            gi_id,
+            _request_payload(),
+            _audit_actor(),
+        )
+        return jsonify(result)
+    except GarduIndukServiceError as exc:
         return _json_error(str(exc), exc.status_code)
     except Exception as exc:
         db.session.rollback()
