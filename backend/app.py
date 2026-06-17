@@ -5,21 +5,27 @@ Flask berjalan sebagai REST API backend untuk frontend terpisah.
 
 from flask import Flask, Response, abort, g, jsonify, request, send_file, session
 from flask_migrate import Migrate
-from config import Config
-from models import (db, GarduInduk, Trafo, Penyulang,
-                    MeterReading, FeederReading,
-                    TransferAntarUnit, RekapBulanan,
-                    EximRule, EximMonthlyResult,
-                    User, AuditLog, AreaUnit, MonthlyDataStatus,
-                    KwhJual)
-from nkwh_excel import analyze_workbook, parse_nkwh_feeders, parse_exim_rows
+from .config import Config
+from .models import (db, GarduInduk, Trafo, Penyulang,
+                     MeterReading, FeederReading,
+                     TransferAntarUnit, RekapBulanan,
+                     EximRule, EximMonthlyResult,
+                     User, AuditLog, AreaUnit, MonthlyDataStatus,
+                     KwhJual)
+from .nkwh_excel import analyze_workbook, parse_nkwh_feeders, parse_exim_rows
 from .routes.system import system_bp
+from .routes.auth import auth_bp
 from .routes.dashboard import (
     dashboard_bp,
     configure_executive_dashboard,
 )
+from .routes.export import export_bp
 from .routes.readings import readings_bp
 from .routes.master import master_bp
+from .routes.profile import profile_bp
+from .routes.security import security_bp
+from .routes.upload import upload_bp
+from .routes.workflow import workflow_bp
 from .routes.penyulang_area import register_penyulang_area_route
 from sqlalchemy import func, text, inspect
 from sqlalchemy import and_
@@ -54,17 +60,23 @@ migrate = Migrate(
 )
 
 app.register_blueprint(system_bp)
+app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
+app.register_blueprint(export_bp)
 app.register_blueprint(readings_bp)
 register_penyulang_area_route(master_bp)
 app.register_blueprint(master_bp)
+app.register_blueprint(profile_bp)
+app.register_blueprint(security_bp)
+app.register_blueprint(upload_bp)
+app.register_blueprint(workflow_bp)
 
 # ════════════════════════════════════════════════
 # KONFIGURASI SECURITY, ROLE, DAN WORKFLOW
 # ════════════════════════════════════════════════
 
 SAFE_METHODS = {'GET', 'HEAD', 'OPTIONS'}
-PUBLIC_ENDPOINTS = {'login', 'api_csrf_token'}
+PUBLIC_ENDPOINTS = {'login', 'api_csrf_token', 'auth.login', 'auth.api_csrf_token'}
 WRITE_ROLES = {'admin', 'operator'}
 ALLOWED_GENERIC_UPLOADS = {'csv', 'xlsx', 'xlsm', 'xls'}
 ALLOWED_NKWH_UPLOADS = {'xlsx', 'xlsm'}
@@ -1188,81 +1200,6 @@ def create_admin_command(username, password, name):
     click.echo(f'Admin {username} berhasil {action}.')
 
 
-@app.route('/login', methods=['POST'])
-def login():
-    if not _validate_csrf():
-        return jsonify({
-            'success': False,
-            'message': 'CSRF token tidak valid.',
-        }), 403
-
-    username = (request.form.get('username') or '').strip()
-    password = request.form.get('password') or ''
-    rate_key = _login_rate_key(username)
-    if _is_login_locked(rate_key):
-        _safe_commit_audit('LOGIN_RATE_LIMITED', detail={'username': username}, status='FAILED', username=username)
-        return jsonify({
-            'success': False,
-            'message': 'Terlalu banyak percobaan login gagal. Coba lagi beberapa menit lagi.',
-        }), 429
-    if _rate_limited(
-        LOGIN_FAILURES,
-        rate_key,
-        app.config.get('LOGIN_RATE_LIMIT', 5),
-        app.config.get('LOGIN_RATE_WINDOW_MINUTES', 15),
-    ):
-        _safe_commit_audit('LOGIN_RATE_LIMITED', detail={'username': username}, status='FAILED', username=username)
-        return jsonify({
-            'success': False,
-            'message': 'Terlalu banyak percobaan login gagal. Coba lagi beberapa menit lagi.',
-        }), 429
-
-    user = User.query.filter_by(username=username).first()
-    if user and user.aktif and user.check_password(password):
-        _login_user(user)
-        g.current_user = user
-        _clear_rate_events(LOGIN_FAILURES, rate_key)
-        _audit('LOGIN', entity_type='user', entity_id=user.id, detail={'username': user.username})
-        db.session.commit()
-        return jsonify({
-            'success': True,
-            'user': user.username,
-            'role': user.role,
-        }), 200
-
-    _record_rate_event(LOGIN_FAILURES, rate_key, app.config.get('LOGIN_RATE_WINDOW_MINUTES', 15))
-    if _rate_limited(
-        LOGIN_FAILURES,
-        rate_key,
-        app.config.get('LOGIN_RATE_LIMIT', 5),
-        app.config.get('LOGIN_RATE_WINDOW_MINUTES', 15),
-    ):
-        _lock_login(rate_key)
-    _safe_commit_audit('LOGIN_FAILED', detail={'username': username}, status='FAILED', username=username)
-    return jsonify({
-        'success': False,
-        'message': 'Username atau password salah',
-    }), 401
-
-
-@app.route('/logout', methods=['POST'])
-def logout():
-    if not _validate_csrf():
-        return jsonify({
-            'success': False,
-            'message': 'CSRF token tidak valid.',
-        }), 403
-    username = session.get('username')
-    _safe_commit_audit('LOGOUT', detail={'username': username}, username=username)
-    _logout_user()
-    return jsonify({'success': True}), 200
-
-
-@app.route('/api/csrf-token')
-def api_csrf_token():
-    return jsonify({'csrf_token': csrf_token()})
-
-
 # ════════════════════════════════════════════════
 # API — MASTER DATA
 # ════════════════════════════════════════════════
@@ -1272,173 +1209,6 @@ def _master_writer_required():
     if not user or user.role not in WRITE_ROLES:
         return _json_error('Akses ubah master data hanya untuk admin/operator.', 403)
     return None
-
-
-@app.route('/api/monthly-status')
-@role_required('admin', 'operator')
-def api_monthly_status_list():
-    try:
-        tahun = request.args.get('tahun', default=date.today().year, type=int)
-        start = date(tahun, 1, 1)
-        end = date(tahun + 1, 1, 1)
-        rows = MonthlyDataStatus.query.filter(
-            MonthlyDataStatus.periode_bulan >= start,
-            MonthlyDataStatus.periode_bulan < end,
-        ).all()
-        by_month = {row.periode_bulan.month: row for row in rows}
-        payload_rows = [
-            _workflow_payload(date(tahun, month, 1), by_month.get(month))
-            for month in range(1, 13)
-        ]
-        return jsonify({'tahun': tahun, 'rows': payload_rows})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/monthly-status/<periode>', methods=['GET', 'PATCH', 'POST'])
-@role_required('admin', 'operator')
-def api_monthly_status_detail(periode):
-    try:
-        period = _workflow_period(periode)
-        record = _workflow_record(period, create=request.method != 'GET')
-
-        if request.method == 'GET':
-            return jsonify(_workflow_payload(period, record))
-
-        denied = _master_writer_required()
-        if denied:
-            return denied
-
-        payload = _request_payload()
-        new_status = _normalize_workflow_status(payload.get('status'))
-        current_status = _normalize_workflow_status(record.status)
-        user = getattr(g, 'current_user', None)
-        allowed = _workflow_allowed_statuses(current_status, user)
-        if new_status not in allowed:
-            return _json_error(
-                f'Transisi status dari {WORKFLOW_STATUS_LABELS[current_status]} '
-                f'ke {WORKFLOW_STATUS_LABELS[new_status]} tidak diizinkan.',
-                400,
-            )
-        if new_status == 'TERKUNCI' and (not user or user.role != 'admin'):
-            return _json_error('Hanya admin yang bisa mengunci periode.', 403)
-
-        force_finalize = _bool_value(payload.get('force_finalize') or payload.get('force'))
-        readiness = None
-        if new_status in {'FINAL', 'TERKUNCI'}:
-            readiness = _readiness_payload(period)
-            if not readiness['can_finalize']:
-                can_override = user and user.role == 'admin' and force_finalize
-                note = _clean_value(payload.get('catatan'))
-                if not can_override:
-                    return jsonify({
-                        'error': 'Data wajib periode ini belum lengkap untuk Final/Terkunci.',
-                        'blockers': readiness['blockers'],
-                        'readiness': readiness,
-                    }), 409
-                if not note:
-                    return jsonify({
-                        'error': 'Catatan wajib diisi untuk override Final/Terkunci.',
-                        'blockers': readiness['blockers'],
-                        'readiness': readiness,
-                    }), 400
-
-        record.status = new_status
-        record.catatan = _clean_value(payload.get('catatan')) or None
-        if new_status == 'TERKUNCI':
-            record.locked_at = datetime.utcnow()
-            record.locked_by = user.username if user else None
-        else:
-            record.locked_at = None
-            record.locked_by = None
-
-        _audit('UPDATE_MONTHLY_STATUS', entity_type='monthly_data_status', entity_id=record.id, detail={
-            'periode_bulan': period.strftime('%Y-%m-%d'),
-            'from_status': current_status,
-            'to_status': new_status,
-            'force_finalize': force_finalize,
-            'readiness_score': readiness['score'] if readiness else None,
-            'readiness_blockers': readiness['blockers'] if readiness else [],
-        })
-        db.session.commit()
-        return jsonify(_workflow_payload(period, record))
-    except ValueError as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/monthly-status/<periode>/activity')
-@role_required('admin', 'operator')
-def api_monthly_status_activity(periode):
-    try:
-        period = _workflow_period(periode)
-        limit = min(request.args.get('limit', default=30, type=int), 100)
-        return jsonify(_monthly_activity_payload(period, limit))
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/monthly-status/<periode>/readiness')
-@role_required('admin', 'operator')
-def api_monthly_status_readiness(periode):
-    try:
-        period = _workflow_period(periode)
-        return jsonify(_readiness_payload(period))
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/monthly-status/<periode>/audit-package')
-@role_required('admin', 'operator', 'auditor')
-def api_monthly_status_audit_package(periode):
-    try:
-        period = _workflow_period(periode)
-        workflow = _workflow_payload(period)
-        readiness = _readiness_payload(period)
-        activity = _monthly_activity_payload(period, 100)
-        user = getattr(g, 'current_user', None)
-        return jsonify({
-            'generated_at': datetime.utcnow().isoformat() + 'Z',
-            'generated_by': user.username if user else None,
-            'periode': period.strftime('%Y-%m'),
-            'periode_bulan': period.strftime('%Y-%m-%d'),
-            'summary': {
-                'workflow_status': workflow['status'],
-                'workflow_label': workflow['label'],
-                'readiness_score': readiness['score'],
-                'can_finalize': readiness['can_finalize'],
-                'blocker_count': len(readiness['blockers']),
-                'alert_count': readiness['alert_count'],
-                'activity_count': len(activity['rows']),
-            },
-            'workflow': workflow,
-            'readiness': readiness,
-            'activity': activity['rows'],
-        })
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/export/<module>.<fmt>')
-@role_required('admin', 'operator', 'auditor')
-def api_export_report(module, fmt):
-    try:
-        return _report_file_response(module, fmt)
-    except ValueError as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
 
 
 def _clean_value(value, default=''):
@@ -1509,176 +1279,6 @@ def api_rekap():
 # ════════════════════════════════════════════════
 # API — UPLOAD (placeholder, lengkap di Sesi 2)
 # ════════════════════════════════════════════════
-
-@app.route('/api/audit-log')
-@role_required('admin')
-def api_audit_log():
-    try:
-        limit = request.args.get('limit', default=100, type=int)
-        limit = min(max(limit, 1), 500)
-        rows = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(limit).all()
-        return jsonify([row.to_dict() for row in rows])
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/security-summary')
-@role_required('admin')
-def api_security_summary():
-    try:
-        users_total = User.query.count()
-        active_users = User.query.filter_by(aktif=True).count()
-        failed_logins = AuditLog.query.filter_by(action='LOGIN_FAILED').count()
-        imports = AuditLog.query.filter(
-            AuditLog.action.in_(['IMPORT_NKWH', 'IMPORT_PENYULANG'])
-        ).count()
-        return jsonify({
-            'users_total': users_total,
-            'active_users': active_users,
-            'failed_logins': failed_logins,
-            'imports': imports,
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/module-access')
-@role_required('admin')
-def api_module_access():
-    try:
-        return jsonify(_module_access_payload(request.args.get('role')))
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/users')
-@role_required('admin')
-def api_users_list():
-    try:
-        rows = User.query.order_by(User.username).all()
-        return jsonify([row.to_dict() for row in rows])
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/users', methods=['POST'])
-@role_required('admin')
-def api_users_create():
-    payload = _request_payload()
-    username = (payload.get('username') or '').strip()
-    password = payload.get('password') or ''
-    role = (payload.get('role') or 'viewer').strip().lower()
-    if not username:
-        return jsonify({'error': 'Username wajib diisi.'}), 400
-    if role not in ROLES:
-        return jsonify({'error': 'Role tidak valid.'}), 400
-    password_error = _validate_password_policy(password)
-    if password_error:
-        return jsonify({'error': password_error}), 400
-    if User.query.filter_by(username=username).first():
-        return jsonify({'error': 'Username sudah digunakan.'}), 409
-
-    user = User(
-        username=username,
-        nama_lengkap=(payload.get('nama_lengkap') or '').strip() or username,
-        email=(payload.get('email') or '').strip() or None,
-        role=role,
-        aktif=_bool_value(payload.get('aktif', True)),
-    )
-    user.set_password(password)
-    db.session.add(user)
-    db.session.flush()
-    _audit('CREATE_USER', entity_type='user', entity_id=user.id, detail=user.to_dict())
-    db.session.commit()
-    return jsonify(user.to_dict()), 201
-
-
-@app.route('/api/users/<int:user_id>', methods=['PATCH', 'POST'])
-@role_required('admin')
-def api_users_update(user_id):
-    user = db.session.get(User, user_id)
-    if not user:
-        return jsonify({'error': 'User tidak ditemukan.'}), 404
-    payload = _request_payload()
-    role = (payload.get('role') or user.role).strip().lower()
-    if role not in ROLES:
-        return jsonify({'error': 'Role tidak valid.'}), 400
-    admin_count = User.query.filter_by(role='admin', aktif=True).count()
-    new_active = _bool_value(payload.get('aktif', user.aktif))
-    if user.role == 'admin' and (role != 'admin' or not new_active) and admin_count <= 1:
-        return jsonify({'error': 'Minimal harus ada satu admin aktif.'}), 400
-
-    before = user.to_dict()
-    user.nama_lengkap = (payload.get('nama_lengkap') or user.nama_lengkap or user.username).strip()
-    user.email = (payload.get('email') or '').strip() or None
-    user.role = role
-    user.aktif = new_active
-    db.session.flush()
-    _audit('UPDATE_USER', entity_type='user', entity_id=user.id, detail={
-        'before': before,
-        'after': user.to_dict(),
-    })
-    db.session.commit()
-    return jsonify(user.to_dict())
-
-
-@app.route('/api/users/<int:user_id>/password', methods=['POST'])
-@role_required('admin')
-def api_users_reset_password(user_id):
-    user = db.session.get(User, user_id)
-    if not user:
-        return jsonify({'error': 'User tidak ditemukan.'}), 404
-    payload = _request_payload()
-    password = payload.get('password') or ''
-    password_error = _validate_password_policy(password)
-    if password_error:
-        return jsonify({'error': password_error}), 400
-    user.set_password(password)
-    db.session.flush()
-    _audit('RESET_USER_PASSWORD', entity_type='user', entity_id=user.id, detail={'username': user.username})
-    db.session.commit()
-    return jsonify({'message': 'Password berhasil direset.'})
-
-
-@app.route('/api/me', methods=['GET', 'PATCH', 'POST'])
-def api_me_profile():
-    user = getattr(g, 'current_user', None)
-    if not user:
-        return jsonify({'error': 'Login diperlukan.'}), 401
-    if request.method == 'GET':
-        return jsonify(user.to_dict())
-    payload = _request_payload()
-    before = user.to_dict()
-    user.nama_lengkap = (payload.get('nama_lengkap') or user.nama_lengkap or user.username).strip()
-    user.email = (payload.get('email') or '').strip() or None
-    db.session.flush()
-    _audit('UPDATE_OWN_PROFILE', entity_type='user', entity_id=user.id, detail={
-        'before': before,
-        'after': user.to_dict(),
-    })
-    db.session.commit()
-    return jsonify(user.to_dict())
-
-
-@app.route('/api/me/password', methods=['POST'])
-def api_change_own_password():
-    user = getattr(g, 'current_user', None)
-    if not user:
-        return jsonify({'error': 'Login diperlukan.'}), 401
-    payload = _request_payload()
-    current_password = payload.get('current_password') or ''
-    new_password = payload.get('new_password') or ''
-    if not user.check_password(current_password):
-        return jsonify({'error': 'Password lama tidak sesuai.'}), 400
-    password_error = _validate_password_policy(new_password)
-    if password_error:
-        return jsonify({'error': password_error}), 400
-    user.set_password(new_password)
-    db.session.flush()
-    _audit('CHANGE_OWN_PASSWORD', entity_type='user', entity_id=user.id, detail={'username': user.username})
-    db.session.commit()
-    return jsonify({'message': 'Password berhasil diganti.'})
-
 
 def _shift_month(period, offset):
     month_index = period.year * 12 + period.month - 1 + offset
@@ -1824,31 +1424,6 @@ def api_kwh_jual():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/upload', methods=['POST'])
-@role_required('admin', 'operator')
-def api_upload():
-    """
-    Upload file NKWh Excel/CSV.
-    Implementasi lengkap ada di upload_engine.py.
-    """
-    if 'file' not in request.files:
-        return jsonify({'error': 'Tidak ada file yang dikirim'}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'Nama file kosong'}), 400
-    try:
-        _check_upload_rate()
-        _validate_upload_file(file, ALLOWED_GENERIC_UPLOADS)
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-
-    # TODO: integrasikan dengan UploadEngine dari upload_engine.py
-    # from upload_engine import UploadEngine
-    # engine = UploadEngine()
-    # result = engine.proses(tmp_path, gi_id, trafo_id, periode)
-    return jsonify({'message': 'Upload endpoint aktif. Integrasi UploadEngine belum selesai.'}), 200
 
 
 def _norm_col(value):
@@ -2212,252 +1787,6 @@ def _nkwh_import_blockers(parsed):
     if not parsed.get('feeder_count'):
         blockers.append('Tidak ada data penyulang yang bisa diimport.')
     return blockers
-
-
-@app.route('/api/nkwh/analyze', methods=['POST'])
-@role_required('admin', 'operator')
-def api_nkwh_analyze():
-    if 'file' not in request.files:
-        return jsonify({'error': 'Tidak ada file yang dikirim'}), 400
-    file = request.files['file']
-    if not file.filename:
-        return jsonify({'error': 'Nama file kosong'}), 400
-
-    try:
-        _check_upload_rate()
-        safe_filename, _ = _validate_upload_file(file, ALLOWED_NKWH_UPLOADS)
-        result = analyze_workbook(file.stream)
-        if result.get('kwh_penyulang', {}).get('feeder_count', 0) > app.config['MAX_IMPORT_ROWS']:
-            return jsonify({'error': f'Jumlah data penyulang melebihi batas {app.config["MAX_IMPORT_ROWS"]}.'}), 400
-        result['filename'] = safe_filename
-        default_bulan = request.form.get('bulan', '').strip()
-        period_value = result.get('periode_bulan') or default_bulan
-        if period_value:
-            period = _month_date(period_value)
-            result['workflow'] = _workflow_payload(period)
-        _audit('ANALYZE_NKWH', entity_type='upload', detail={
-            'filename': safe_filename,
-            'periode_bulan': result.get('periode_bulan'),
-            'feeder_count': result.get('kwh_penyulang', {}).get('feeder_count'),
-            'exim_rows': result.get('exim', {}).get('row_count'),
-        })
-        db.session.commit()
-        return jsonify(result)
-    except ValueError as e:
-        db.session.rollback()
-        _safe_commit_audit('ANALYZE_NKWH', detail={'filename': file.filename, 'error': str(e)}, status='FAILED')
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        db.session.rollback()
-        _safe_commit_audit('ANALYZE_NKWH', detail={'filename': file.filename, 'error': str(e)}, status='FAILED')
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/nkwh/import', methods=['POST'])
-@role_required('admin', 'operator')
-def api_nkwh_import():
-    if 'file' not in request.files:
-        return jsonify({'error': 'Tidak ada file yang dikirim'}), 400
-    file = request.files['file']
-    if not file.filename:
-        return jsonify({'error': 'Nama file kosong'}), 400
-
-    threshold_pct = request.form.get('threshold_pct', default=25, type=float)
-    min_delta = request.form.get('min_delta', default=10000, type=float)
-    default_bulan = request.form.get('bulan', '').strip()
-    import_exim = request.form.get('import_exim', '1') == '1'
-
-    try:
-        _check_upload_rate()
-        safe_filename, _ = _validate_upload_file(file, ALLOWED_NKWH_UPLOADS)
-        parsed = parse_nkwh_feeders(file.stream)
-        if parsed.get('feeder_count', 0) > app.config['MAX_IMPORT_ROWS']:
-            return jsonify({'error': f'Jumlah data penyulang melebihi batas {app.config["MAX_IMPORT_ROWS"]}.'}), 400
-        blockers = _nkwh_import_blockers(parsed)
-        if blockers:
-            return jsonify({'error': 'Import dibatalkan karena validasi gagal.', 'errors': blockers}), 400
-        period = _nkwh_period(parsed.get('periode_bulan'), default_bulan or None)
-        _ensure_period_writable(period)
-        created = updated = alerts = 0
-
-        for item in parsed.get('feeders', []):
-            gi = _find_or_create_gi_from_name(item.get('gardu_induk'))
-            trafo = _find_or_create_trafo_from_nkwh(gi, item.get('kode_trafo'), item.get('nama_trafo'))
-            penyulang = _find_or_create_penyulang_from_nkwh(item, gi, trafo)
-
-            reading = FeederReading.query.filter_by(
-                penyulang_id=penyulang.id,
-                periode_bulan=period,
-            ).first()
-            if reading:
-                updated += 1
-            else:
-                created += 1
-                reading = FeederReading(
-                    penyulang_id=penyulang.id,
-                    periode_bulan=period,
-                )
-                db.session.add(reading)
-
-            reading.trafo_id = trafo.id
-            reading.gi_id = gi.id
-            _apply_nkwh_registers(reading, item)
-            db.session.flush()
-            _set_anomaly(reading, threshold_pct, min_delta)
-            if reading.flag_alert:
-                alerts += 1
-
-        exim_created = exim_updated = 0
-        if import_exim:
-            file.stream.seek(0)
-            exim = parse_exim_rows(file.stream)
-            exim_created, exim_updated = _import_nkwh_exim_rows(exim.get('rows', []), period)
-
-        workflow_record = _mark_period_uploaded(period, 'NKWH', safe_filename)
-        _audit('IMPORT_NKWH', entity_type='upload', detail={
-            'filename': safe_filename,
-            'periode_bulan': period.strftime('%Y-%m-%d'),
-            'created': created,
-            'updated': updated,
-            'alerts': alerts,
-            'exim_created': exim_created,
-            'exim_updated': exim_updated,
-            'feeder_count': parsed.get('feeder_count', 0),
-            'gi_count': parsed.get('gi_count', 0),
-            'workflow_status': workflow_record.status,
-        })
-        db.session.commit()
-        return jsonify({
-            'message': 'Import NKWh selesai',
-            'periode_bulan': period.strftime('%Y-%m-%d'),
-            'created': created,
-            'updated': updated,
-            'alerts': alerts,
-            'exim_created': exim_created,
-            'exim_updated': exim_updated,
-            'feeder_count': parsed.get('feeder_count', 0),
-            'gi_count': parsed.get('gi_count', 0),
-            'total_kwh': parsed.get('total_kwh', 0),
-            'workflow': _workflow_payload(period, workflow_record),
-        })
-    except ValueError as e:
-        db.session.rollback()
-        _safe_commit_audit('IMPORT_NKWH', detail={'filename': file.filename, 'error': str(e)}, status='FAILED')
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        db.session.rollback()
-        _safe_commit_audit('IMPORT_NKWH', detail={'filename': file.filename, 'error': str(e)}, status='FAILED')
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/upload-penyulang', methods=['POST'])
-@role_required('admin', 'operator')
-def api_upload_penyulang():
-    if 'file' not in request.files:
-        return jsonify({'error': 'Tidak ada file yang dikirim'}), 400
-    file = request.files['file']
-    if not file.filename:
-        return jsonify({'error': 'Nama file kosong'}), 400
-
-    default_gi_id = request.form.get('gi_id', type=int)
-    default_trafo_id = request.form.get('trafo_id', type=int)
-    default_bulan = request.form.get('bulan', '').strip()
-    threshold_pct = request.form.get('threshold_pct', default=25, type=float)
-    min_delta = request.form.get('min_delta', default=10000, type=float)
-
-    try:
-        _check_upload_rate()
-        safe_filename, _ = _validate_upload_file(file, ALLOWED_GENERIC_UPLOADS)
-        frame = _read_upload_table(file)
-        created = updated = alerts = 0
-        errors = []
-        checked_periods = set()
-        imported_periods = {}
-
-        for idx, raw in frame.iterrows():
-            row = raw.to_dict()
-            try:
-                period = _month_date(_pick(row, ['bulan', 'periode', 'periode_bulan', 'month']), default_bulan or None)
-                period_key = period.isoformat()
-                if period_key not in checked_periods:
-                    _ensure_period_writable(period)
-                    checked_periods.add(period_key)
-                gi = _find_or_create_gi(row, default_gi_id)
-                trafo = _find_or_create_trafo(row, gi, default_trafo_id)
-                penyulang = _find_or_create_penyulang(row, gi, trafo)
-                stand_awal, stand_akhir, faktor, wbp, lwbp1, lwbp2, total = _reading_values(row)
-
-                reading = FeederReading.query.filter_by(
-                    penyulang_id=penyulang.id,
-                    periode_bulan=period
-                ).first()
-                if reading:
-                    updated += 1
-                else:
-                    created += 1
-                    reading = FeederReading(
-                        penyulang_id=penyulang.id,
-                        trafo_id=trafo.id,
-                        gi_id=gi.id,
-                        periode_bulan=period,
-                    )
-                    db.session.add(reading)
-
-                reading.trafo_id = trafo.id
-                reading.gi_id = gi.id
-                reading.stand_awal = Decimal(str(stand_awal))
-                reading.stand_akhir = Decimal(str(stand_akhir))
-                reading.faktor_kali = Decimal(str(faktor))
-                reading.kwh_wbp = Decimal(str(wbp))
-                reading.kwh_lwbp1 = Decimal(str(lwbp1))
-                reading.kwh_lwbp2 = Decimal(str(lwbp2))
-                db.session.flush()
-                _set_anomaly(reading, threshold_pct, min_delta)
-                if reading.flag_alert:
-                    alerts += 1
-                imported_periods[period_key] = period
-            except Exception as row_error:
-                errors.append({'baris': int(idx) + 2, 'error': str(row_error)})
-
-        if errors and not (created or updated):
-            db.session.rollback()
-            _safe_commit_audit('IMPORT_PENYULANG', detail={
-                'filename': safe_filename,
-                'errors': errors[:10],
-            }, status='FAILED')
-            return jsonify({'error': 'Upload gagal. Tidak ada baris valid.', 'errors': errors[:10]}), 400
-
-        workflow_rows = []
-        for period in imported_periods.values():
-            record = _mark_period_uploaded(period, 'PENYULANG', safe_filename)
-            workflow_rows.append(_workflow_payload(period, record))
-
-        _audit('IMPORT_PENYULANG', entity_type='upload', detail={
-            'filename': safe_filename,
-            'created': created,
-            'updated': updated,
-            'alerts': alerts,
-            'error_count': len(errors),
-            'periods': sorted(imported_periods),
-        })
-        db.session.commit()
-        return jsonify({
-            'message': 'Upload penyulang selesai',
-            'created': created,
-            'updated': updated,
-            'alerts': alerts,
-            'errors': errors[:10],
-            'error_count': len(errors),
-            'workflow': workflow_rows,
-        })
-    except ValueError as e:
-        db.session.rollback()
-        _safe_commit_audit('IMPORT_PENYULANG', detail={'filename': file.filename, 'error': str(e)}, status='FAILED')
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        db.session.rollback()
-        _safe_commit_audit('IMPORT_PENYULANG', detail={'filename': file.filename, 'error': str(e)}, status='FAILED')
-        return jsonify({'error': str(e)}), 500
 
 
 # ════════════════════════════════════════════════

@@ -1,31 +1,25 @@
 import unittest
+from pathlib import Path
 
-import config as legacy_config
-import models as legacy_models
-import nkwh_excel as legacy_nkwh_excel
 from backend import config as package_config
 from backend import models as package_models
 from backend import nkwh_excel as package_nkwh_excel
 
+ROOT_DIR = Path(__file__).resolve().parents[2]
+
 
 class BackendPackageImportTest(unittest.TestCase):
-    def test_config_bridge_uses_package_config(self):
-        self.assertIs(legacy_config.Config, package_config.Config)
+    def test_backend_package_imports_are_canonical(self):
+        self.assertEqual(package_config.Config.__module__, "backend.config")
+        self.assertEqual(package_models.db.__module__, "flask_sqlalchemy.extension")
+        self.assertEqual(package_models.GarduInduk.__module__, "backend.models")
+        self.assertEqual(package_models.MeterReading.__module__, "backend.models")
+        self.assertEqual(package_nkwh_excel.analyze_workbook.__module__, "backend.nkwh_excel")
+        self.assertEqual(package_nkwh_excel.parse_nkwh_feeders.__module__, "backend.nkwh_excel")
 
-    def test_models_bridge_uses_one_sqlalchemy_registry(self):
-        self.assertIs(legacy_models.db, package_models.db)
-        self.assertIs(legacy_models.GarduInduk, package_models.GarduInduk)
-        self.assertIs(legacy_models.MeterReading, package_models.MeterReading)
-
-    def test_nkwh_bridge_uses_package_parser(self):
-        self.assertIs(
-            legacy_nkwh_excel.analyze_workbook,
-            package_nkwh_excel.analyze_workbook,
-        )
-        self.assertIs(
-            legacy_nkwh_excel.parse_nkwh_feeders,
-            package_nkwh_excel.parse_nkwh_feeders,
-        )
+    def test_legacy_root_python_bridges_are_removed(self):
+        for filename in ("config.py", "models.py", "nkwh_excel.py"):
+            self.assertFalse((ROOT_DIR / filename).exists(), filename)
 
 
 if __name__ == "__main__":
