@@ -24,7 +24,8 @@ class SystemBlueprintTest(unittest.TestCase):
             db.session.commit()
 
     def tearDown(self):
-        db.session.remove()
+        with app.app_context():
+            db.session.remove()
 
     def test_sidebar_route_is_registered_from_system_blueprint(self):
         rule = next(
