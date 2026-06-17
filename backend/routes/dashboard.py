@@ -6,18 +6,18 @@ from flask import Blueprint, jsonify, request
 
 from ..services.dashboard_data import get_dashboard_data
 from ..services.executive_dashboard import get_executive_dashboard
+from ..services.monthly_readiness import readiness_payload
+from ..services.monthly_workflow import workflow_payload
 
 
 dashboard_bp = Blueprint("dashboard", __name__)
-_readiness_provider = None
-_workflow_provider = None
+_readiness_provider = readiness_payload
+_workflow_provider = workflow_payload
 
 
-def configure_executive_dashboard(*, readiness_provider, workflow_provider) -> None:
-    """Inject existing monthly readiness and workflow payload providers."""
-    global _readiness_provider, _workflow_provider
-    _readiness_provider = readiness_provider
-    _workflow_provider = workflow_provider
+def configure_executive_dashboard(*, readiness_provider=None, workflow_provider=None) -> None:
+    """Backward-compatible hook; monthly services remain the canonical providers."""
+    return None
 
 
 @dashboard_bp.get("/api/dashboard-data")
@@ -36,8 +36,6 @@ def api_executive_dashboard():
         month = request.args.get("month", type=int) or date.today().month
         if month < 1 or month > 12:
             return jsonify({"error": "Bulan tidak valid."}), 400
-        if _readiness_provider is None or _workflow_provider is None:
-            raise RuntimeError("Executive dashboard providers belum dikonfigurasi.")
 
         return jsonify(get_executive_dashboard(
             period=date(year, month, 1),
