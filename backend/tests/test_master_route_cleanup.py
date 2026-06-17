@@ -16,11 +16,10 @@ class MasterRouteCleanupTest(unittest.TestCase):
             "@app.route('/api/trafo'",
             "@app.route('/api/penyulang',",
             "@app.route('/api/penyulang/<int:penyulang_id>'",
+            "@app.route('/api/penyulang-area')",
         )
         for marker in forbidden:
             self.assertNotIn(marker, source)
-
-        self.assertIn("@app.route('/api/penyulang-area')", source)
 
     def test_route_compatibility_bridge_is_removed(self):
         self.assertFalse((BACKEND_DIR / "route_compat.py").exists())
@@ -38,6 +37,7 @@ class MasterRouteCleanupTest(unittest.TestCase):
             "/api/trafo/<int:trafo_id>": "master.api_trafo_update",
             "/api/penyulang": "master.api_penyulang",
             "/api/penyulang/<int:penyulang_id>": "master.api_penyulang_update",
+            "/api/penyulang-area": "master.api_penyulang_area",
         }
 
         for path, endpoint in expected.items():
