@@ -17,8 +17,20 @@ jobs:
           python-version: "3.12"
       - run: pip install -r backend/requirements.txt
       - run: python scripts/refactor_feeder_data.py
-      - run: python -m unittest discover -s backend/tests -t . -v
+      - name: Run tests and capture output
+        shell: bash
+        run: |
+          set +e
+          python -m unittest discover -s backend/tests -t . -v > backend/feeder-refactor-test-output.txt 2>&1
+          echo $? > backend/feeder-refactor-test-exit.txt
+          set -e
+          cat backend/feeder-refactor-test-output.txt
       - uses: actions/upload-artifact@v4
         with:
           name: patched-app
-          path: backend/app.py
+          path: |
+            backend/app.py
+            backend/feeder-refactor-test-output.txt
+            backend/feeder-refactor-test-exit.txt
+      - name: Enforce test result
+        run: test "$(cat backend/feeder-refactor-test-exit.txt)" = "0"
