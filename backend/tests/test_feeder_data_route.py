@@ -56,7 +56,7 @@ class FeederDataRouteTest(unittest.TestCase):
 
         source = (BACKEND_DIR / "app.py").read_text(encoding="utf-8")
         self.assertNotIn("@app.route('/api/feeder-data')", source)
-        self.assertIn("@app.route('/api/meter-data')", source)
+        self.assertIn("@app.route('/api/transfer-data')", source)
 
 
 if __name__ == "__main__":

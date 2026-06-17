@@ -12,7 +12,7 @@ class DashboardRouteCleanupTest(unittest.TestCase):
         source = (BACKEND_DIR / "app.py").read_text(encoding="utf-8")
         self.assertNotIn("@app.route('/api/dashboard-data')", source)
         self.assertNotIn("@app.route('/api/executive-dashboard')", source)
-        self.assertIn("@app.route('/api/meter-data')", source)
+        self.assertIn("@app.route('/api/transfer-data')", source)
 
     def test_dashboard_routes_are_registered_once(self):
         expected = {

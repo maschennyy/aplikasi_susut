@@ -1466,37 +1466,6 @@ configure_executive_dashboard(
 # API — FEEDER, METER, TRANSFER, REKAP
 # ════════════════════════════════════════════════
 
-@app.route('/api/meter-data')
-def api_meter_data():
-    try:
-        gi_id    = request.args.get('gi_id',    type=int)
-        trafo_id = request.args.get('trafo_id', type=int)
-        bulan    = request.args.get('bulan')
-
-        q = db.session.query(MeterReading, Trafo, GarduInduk)\
-              .join(Trafo,      MeterReading.trafo_id == Trafo.id)\
-              .join(GarduInduk, MeterReading.gi_id    == GarduInduk.id)
-        if gi_id:    q = q.filter(MeterReading.gi_id    == gi_id)
-        if trafo_id: q = q.filter(MeterReading.trafo_id == trafo_id)
-        if bulan:
-            thn, bln = bulan.split('-')
-            q = q.filter(
-                func.extract('year',  MeterReading.periode_bulan) == int(thn),
-                func.extract('month', MeterReading.periode_bulan) == int(bln)
-            )
-
-        result = []
-        for mr, tr, gi in q.order_by(MeterReading.periode_bulan).all():
-            d = mr.to_dict()
-            d['kode_trafo'] = tr.kode_trafo
-            d['nama_trafo'] = tr.nama_trafo
-            d['nama_gi']    = gi.nama_gi
-            result.append(d)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
 @app.route('/api/transfer-data')
 def api_transfer_data():
     try:
