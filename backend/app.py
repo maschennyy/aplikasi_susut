@@ -15,6 +15,7 @@ from models import (db, GarduInduk, Trafo, Penyulang,
 from nkwh_excel import analyze_workbook, parse_nkwh_feeders, parse_exim_rows
 from .routes.system import system_bp
 from .routes.master import master_bp
+from .routes.penyulang_area import register_penyulang_area_route
 from sqlalchemy import func, text, inspect
 from sqlalchemy import and_
 from collections import defaultdict, deque
@@ -48,6 +49,7 @@ migrate = Migrate(
 )
 
 app.register_blueprint(system_bp)
+register_penyulang_area_route(master_bp)
 app.register_blueprint(master_bp)
 
 # ════════════════════════════════════════════════
@@ -1441,21 +1443,6 @@ def _decimal_payload(value, default='0'):
     if value in (None, ''):
         return Decimal(default)
     return Decimal(str(value))
-
-
-@app.route('/api/penyulang-area')
-def api_penyulang_area():
-    try:
-        rows = db.session.query(Penyulang.area_up3)\
-            .filter(Penyulang.aktif.is_(True))\
-            .filter(Penyulang.area_up3.isnot(None))\
-            .filter(Penyulang.area_up3 != '')\
-            .distinct()\
-            .order_by(Penyulang.area_up3)\
-            .all()
-        return jsonify([r[0] for r in rows])
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 
 # ════════════════════════════════════════════════
