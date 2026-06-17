@@ -1,0 +1,43 @@
+name: Apply executive dashboard refactor
+
+on:
+  push:
+    branches:
+      - executive-dashboard-blueprint
+    paths:
+      - ".github/workflows/apply-executive-dashboard-refactor.yml"
+      - "scripts/refactor_executive_dashboard.py"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/apply-executive-dashboard-refactor.yml"
+      - "scripts/refactor_executive_dashboard.py"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: executive-dashboard-blueprint
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r backend/requirements.txt
+      - run: python scripts/refactor_executive_dashboard.py
+      - run: python -m unittest discover -s backend/tests -t . -v
+      - name: Save app refactor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/app.py
+          git commit -m "refactor: move executive dashboard to blueprint"
+          git push origin HEAD:executive-dashboard-blueprint
