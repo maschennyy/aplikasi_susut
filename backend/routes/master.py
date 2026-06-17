@@ -17,6 +17,12 @@ from ..services.gardu_induk import (
     update_gardu_induk,
 )
 from ..services.master_summary import get_master_data_summary
+from ..services.trafo import (
+    TrafoServiceError,
+    create_trafo,
+    list_trafos,
+    update_trafo,
+)
 
 
 master_bp = Blueprint("master", __name__)
@@ -63,7 +69,6 @@ def _audit_actor() -> AuditActor:
 
 @master_bp.get("/api/master-data/summary")
 def api_master_summary():
-    """Return active master totals and incomplete mapping counts."""
     try:
         return jsonify(get_master_data_summary())
     except Exception as exc:
@@ -77,11 +82,8 @@ def api_area_unit():
             denied = _master_writer_denied()
             if denied:
                 return denied
-            result = create_area_unit(_request_payload(), _audit_actor())
-            return jsonify(result), 201
-
-        include_inactive = request.args.get("all") == "1"
-        return jsonify(list_area_units(include_inactive=include_inactive))
+            return jsonify(create_area_unit(_request_payload(), _audit_actor())), 201
+        return jsonify(list_area_units(request.args.get("all") == "1"))
     except AreaUnitServiceError as exc:
         return _json_error(str(exc), exc.status_code)
     except Exception as exc:
@@ -94,14 +96,8 @@ def api_area_unit_update(unit_id: int):
     denied = _master_writer_denied()
     if denied:
         return denied
-
     try:
-        result = update_area_unit(
-            unit_id,
-            _request_payload(),
-            _audit_actor(),
-        )
-        return jsonify(result)
+        return jsonify(update_area_unit(unit_id, _request_payload(), _audit_actor()))
     except AreaUnitServiceError as exc:
         return _json_error(str(exc), exc.status_code)
     except Exception as exc:
@@ -116,11 +112,8 @@ def api_gardu_induk():
             denied = _master_writer_denied()
             if denied:
                 return denied
-            result = create_gardu_induk(_request_payload(), _audit_actor())
-            return jsonify(result), 201
-
-        include_inactive = request.args.get("all") == "1"
-        return jsonify(list_gardu_induk(include_inactive=include_inactive))
+            return jsonify(create_gardu_induk(_request_payload(), _audit_actor())), 201
+        return jsonify(list_gardu_induk(request.args.get("all") == "1"))
     except GarduIndukServiceError as exc:
         return _json_error(str(exc), exc.status_code)
     except Exception as exc:
@@ -133,15 +126,43 @@ def api_gardu_induk_update(gi_id: int):
     denied = _master_writer_denied()
     if denied:
         return denied
-
     try:
-        result = update_gardu_induk(
-            gi_id,
-            _request_payload(),
-            _audit_actor(),
-        )
-        return jsonify(result)
+        return jsonify(update_gardu_induk(gi_id, _request_payload(), _audit_actor()))
     except GarduIndukServiceError as exc:
+        return _json_error(str(exc), exc.status_code)
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 500
+
+
+@master_bp.route("/api/trafo", methods=["GET", "POST"])
+def api_trafo():
+    try:
+        if request.method == "POST":
+            denied = _master_writer_denied()
+            if denied:
+                return denied
+            return jsonify(create_trafo(_request_payload(), _audit_actor())), 201
+
+        return jsonify(list_trafos(
+            include_inactive=request.args.get("all") == "1",
+            gi_id=request.args.get("gi_id", type=int),
+        ))
+    except TrafoServiceError as exc:
+        return _json_error(str(exc), exc.status_code)
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 500
+
+
+@master_bp.route("/api/trafo/<int:trafo_id>", methods=["PATCH", "POST"])
+def api_trafo_update(trafo_id: int):
+    denied = _master_writer_denied()
+    if denied:
+        return denied
+    try:
+        return jsonify(update_trafo(trafo_id, _request_payload(), _audit_actor()))
+    except TrafoServiceError as exc:
         return _json_error(str(exc), exc.status_code)
     except Exception as exc:
         db.session.rollback()
