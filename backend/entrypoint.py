@@ -21,20 +21,8 @@ from .app import (
     MIGRATIONS_DIR,
 )
 from .migration_tools import register_migration_commands
-from .route_compat import normalize_migrated_routes
 
 
-normalize_migrated_routes(
-    app,
-    "api_area_unit",
-    "api_area_unit_update",
-    "api_gardu_induk",
-    "api_gardu_induk_update",
-    "api_trafo",
-    "api_trafo_update",
-    "api_penyulang_list",
-    "api_penyulang_update",
-)
 register_migration_commands(app, db)
 
 
