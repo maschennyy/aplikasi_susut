@@ -15,6 +15,7 @@ def list_feeder_data(
     *,
     gi_id: Any = None,
     trafo_id: Any = None,
+    penyulang_id: Any = None,
     month: Any = "",
     page: Any = None,
     page_size: Any = None,
@@ -23,6 +24,7 @@ def list_feeder_data(
     filters = parse_reading_filters(
         gi_id=gi_id,
         trafo_id=trafo_id,
+        penyulang_id=penyulang_id,
         month=month,
     )
     pagination_params = parse_pagination(page=page, page_size=page_size)
@@ -35,6 +37,8 @@ def list_feeder_data(
         query = query.filter(FeederReading.gi_id == filters.gi_id)
     if filters.trafo_id is not None:
         query = query.filter(FeederReading.trafo_id == filters.trafo_id)
+    if filters.penyulang_id is not None:
+        query = query.filter(FeederReading.penyulang_id == filters.penyulang_id)
     if filters.period_start is not None and filters.period_end is not None:
         query = query.filter(
             FeederReading.periode_bulan >= filters.period_start,
