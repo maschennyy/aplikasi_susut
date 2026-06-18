@@ -21,8 +21,11 @@ class FeederDataRouteTest(unittest.TestCase):
             ("/api/feeder-data?gi_id=abc", 400, "Filter GI harus berupa ID positif."),
             ("/api/feeder-data?gi_id=-1", 400, "Filter GI harus berupa ID positif."),
             ("/api/feeder-data?trafo_id=0", 400, "Filter Trafo harus berupa ID positif."),
+            ("/api/feeder-data?penyulang_id=abc", 400, "Filter Penyulang harus berupa ID positif."),
+            ("/api/feeder-data?penyulang_id=0", 400, "Filter Penyulang harus berupa ID positif."),
             ("/api/feeder-data?gi_id=999999", 404, "Gardu induk tidak ditemukan."),
             ("/api/feeder-data?trafo_id=999999", 404, "Trafo tidak ditemukan."),
+            ("/api/feeder-data?penyulang_id=999999", 404, "Penyulang tidak ditemukan."),
         ]
         for url, status, message in cases:
             with self.subTest(url=url):
