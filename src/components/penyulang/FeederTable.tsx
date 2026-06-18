@@ -6,7 +6,7 @@ import type { TableColumnsType } from "antd";
 import { CalendarClock, FilterX, RefreshCw } from "lucide-react";
 import { AnomalyBadge } from "@/components/penyulang/AnomalyBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
-import type { FeederMetadata, FeederRow } from "@/hooks/useFeederData";
+import type { FeederMetadata, FeederPagination, FeederRow } from "@/hooks/useFeederData";
 import styles from "./penyulang.module.css";
 
 const { Text } = Typography;
@@ -14,6 +14,7 @@ const { Text } = Typography;
 type FeederTableProps = {
   rows: FeederRow[];
   metadata: FeederMetadata;
+  pagination: FeederPagination;
   loading: boolean;
   error: string | null;
   hasEntityFilters: boolean;
@@ -21,6 +22,7 @@ type FeederTableProps = {
   onPreviousPeriod: () => void;
   onResetFilters: () => void;
   onRefresh: () => Promise<void>;
+  onPaginationChange: (page: number, pageSize: number) => void;
 };
 
 const NUMBER_FORMATTER = new Intl.NumberFormat("id-ID", {
@@ -56,6 +58,7 @@ function rowSeverityClass(row: FeederRow) {
 export function FeederTable({
   rows,
   metadata,
+  pagination,
   loading,
   error,
   hasEntityFilters,
@@ -63,6 +66,7 @@ export function FeederTable({
   onPreviousPeriod,
   onResetFilters,
   onRefresh,
+  onPaginationChange,
 }: FeederTableProps) {
   const [expandedRowKeys, setExpandedRowKeys] = useState<readonly React.Key[]>([]);
 
@@ -224,7 +228,9 @@ export function FeederTable({
         }}
         loading={loading}
         pagination={{
-          defaultPageSize: 50,
+          current: pagination.page,
+          pageSize: pagination.pageSize,
+          total: pagination.total,
           pageSizeOptions: [25, 50, 100, 200],
           showSizeChanger: true,
           showTotal: (total, range) => `${range[0]}-${range[1]} dari ${total} baris`,
@@ -235,6 +241,14 @@ export function FeederTable({
         showSorterTooltip={false}
         size="middle"
         virtual
+        onChange={(nextPagination) => {
+          const nextPageSize = nextPagination.pageSize ?? pagination.pageSize;
+          const pageSizeChanged = nextPageSize !== pagination.pageSize;
+          const nextPage = pageSizeChanged ? 1 : (nextPagination.current ?? pagination.page);
+
+          setExpandedRowKeys([]);
+          onPaginationChange(nextPage, nextPageSize);
+        }}
         onRow={(row) => ({
           onClick: () => {
             setExpandedRowKeys((current) =>
