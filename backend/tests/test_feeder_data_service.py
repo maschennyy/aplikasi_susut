@@ -93,6 +93,8 @@ class FeederDataServiceTest(unittest.TestCase):
             self.gi_b = gi_b.id
             self.trafo_a = trafo_a.id
             self.trafo_b = trafo_b.id
+            self.feeder_a = feeder_a.id
+            self.feeder_b = feeder_b.id
 
     def tearDown(self):
         with app.app_context():
@@ -127,6 +129,16 @@ class FeederDataServiceTest(unittest.TestCase):
         self.assertEqual([row["kode_penyulang"] for row in rows], ["B-01"])
         self.assertEqual(rows[0]["status"], "CADANGAN")
 
+    def test_filters_by_penyulang(self):
+        with app.app_context():
+            result = list_feeder_data(penyulang_id=self.feeder_b)
+
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(
+            [row["penyulang_id"] for row in result["rows"]],
+            [self.feeder_b],
+        )
+
     def test_paginates_and_caps_page_size(self):
         with app.app_context():
             first_page = list_feeder_data(page=1, page_size=1)
@@ -150,6 +162,26 @@ class FeederDataServiceTest(unittest.TestCase):
             str(context.exception),
             "Trafo tidak berada pada Gardu Induk yang dipilih.",
         )
+
+    def test_rejects_penyulang_from_different_gi_or_trafo(self):
+        cases = [
+            (
+                {"gi_id": self.gi_a, "penyulang_id": self.feeder_b},
+                "Penyulang tidak berada pada Gardu Induk yang dipilih.",
+            ),
+            (
+                {"trafo_id": self.trafo_a, "penyulang_id": self.feeder_b},
+                "Penyulang tidak berada pada Trafo yang dipilih.",
+            ),
+        ]
+
+        with app.app_context():
+            for params, message in cases:
+                with self.subTest(params=params):
+                    with self.assertRaises(FeederDataServiceError) as context:
+                        list_feeder_data(**params)
+                    self.assertEqual(context.exception.status_code, 400)
+                    self.assertEqual(str(context.exception), message)
 
 
 if __name__ == "__main__":
