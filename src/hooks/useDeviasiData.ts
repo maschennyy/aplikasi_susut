@@ -5,6 +5,15 @@ import dayjs from "dayjs";
 import { api, apiErrorMessage } from "@/lib/api";
 import type { GarduIndukOption, TrafoOption } from "@/hooks/useFeederData";
 import {
+  asArray,
+  asRecord,
+  firstBoolean,
+  firstNumber,
+  firstString,
+  periodFromValue,
+  toNullableNumber,
+} from "@/lib/normalizers";
+import {
   buildDeviasiRows,
   summarizeDeviasi,
   type DeviasiFeederSource,
@@ -51,72 +60,6 @@ const EMPTY_MASTER: DeviasiMasterData = {
 };
 
 const EMPTY_SUMMARY = summarizeDeviasi([]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return isRecord(value) ? value : {};
-}
-
-function asArray(value: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(isRecord);
-}
-
-function toNumber(value: unknown, fallback = 0) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const normalized = value.trim().replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-  return fallback;
-}
-
-function toNullableNumber(value: unknown) {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = toNumber(value, Number.NaN);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function firstNumber(record: Record<string, unknown>, keys: string[], fallback = 0) {
-  for (const key of keys) {
-    if (record[key] !== undefined && record[key] !== null && record[key] !== "") {
-      return toNumber(record[key], fallback);
-    }
-  }
-  return fallback;
-}
-
-function firstString(record: Record<string, unknown>, keys: string[], fallback = "") {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-    if (typeof value === "number") return String(value);
-  }
-  return fallback;
-}
-
-function firstBoolean(record: Record<string, unknown>, keys: string[], fallback = true) {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "boolean") return value;
-    if (typeof value === "string") return !["false", "0", "nonaktif"].includes(value.toLowerCase());
-  }
-  return fallback;
-}
-
-function periodFromValue(value: unknown, fallbackPeriod: string) {
-  if (typeof value === "string" && /^\d{6}$/.test(value)) {
-    return `${value.slice(0, 4)}-${value.slice(4, 6)}`;
-  }
-  if (typeof value === "string" && /^\d{4}-\d{2}/.test(value)) {
-    return value.slice(0, 7);
-  }
-  return `${fallbackPeriod.slice(0, 4)}-${fallbackPeriod.slice(4, 6)}`;
-}
 
 function normalizeGarduInduk(data: unknown): GarduIndukOption[] {
   return asArray(data).map((row) => ({

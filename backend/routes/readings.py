@@ -16,6 +16,8 @@ def api_feeder_data():
             gi_id=request.args.get("gi_id"),
             trafo_id=request.args.get("trafo_id"),
             month=request.args.get("bulan", ""),
+            page=request.args.get("page"),
+            page_size=request.args.get("page_size"),
         ))
     except FeederDataServiceError as exc:
         return jsonify({"error": str(exc)}), exc.status_code
@@ -30,6 +32,8 @@ def api_meter_data():
             gi_id=request.args.get("gi_id"),
             trafo_id=request.args.get("trafo_id"),
             month=request.args.get("bulan", ""),
+            page=request.args.get("page"),
+            page_size=request.args.get("page_size"),
         ))
     except MeterDataServiceError as exc:
         return jsonify({"error": str(exc)}), exc.status_code

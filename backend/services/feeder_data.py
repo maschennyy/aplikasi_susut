@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..models import FeederReading, Penyulang, db
-from .reading_filters import ReadingFilterError, parse_reading_filters
+from .reading_filters import ReadingFilterError, parse_pagination, parse_reading_filters
 
 
 FeederDataServiceError = ReadingFilterError
@@ -16,13 +16,16 @@ def list_feeder_data(
     gi_id: Any = None,
     trafo_id: Any = None,
     month: Any = "",
-) -> list[dict]:
+    page: Any = None,
+    page_size: Any = None,
+) -> dict:
     """Return feeder readings enriched with Penyulang master fields."""
     filters = parse_reading_filters(
         gi_id=gi_id,
         trafo_id=trafo_id,
         month=month,
     )
+    pagination_params = parse_pagination(page=page, page_size=page_size)
 
     query = db.session.query(FeederReading, Penyulang).join(
         Penyulang,
@@ -38,8 +41,13 @@ def list_feeder_data(
             FeederReading.periode_bulan < filters.period_end,
         )
 
+    pagination = query.order_by(Penyulang.kode_penyulang, FeederReading.id).paginate(
+        page=pagination_params.page,
+        per_page=pagination_params.page_size,
+        error_out=False,
+    )
     rows = []
-    for reading, feeder in query.order_by(Penyulang.kode_penyulang).all():
+    for reading, feeder in pagination.items:
         payload = reading.to_dict()
         payload.update({
             "kode_penyulang": feeder.kode_penyulang,
@@ -52,4 +60,12 @@ def list_feeder_data(
             ),
         })
         rows.append(payload)
-    return rows
+    return {
+        "rows": rows,
+        "total": pagination.total,
+        "page": pagination.page,
+        "page_size": pagination.per_page,
+        "pages": pagination.pages,
+        "has_next": pagination.has_next,
+        "has_prev": pagination.has_prev,
+    }

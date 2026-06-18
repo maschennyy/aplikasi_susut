@@ -79,8 +79,12 @@ class MeterDataServiceTest(unittest.TestCase):
 
     def test_enriches_meter_reading_with_trafo_and_gi(self):
         with app.app_context():
-            rows = list_meter_data(month="2025-05")
+            result = list_meter_data(month="2025-05")
 
+        rows = result["rows"]
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(result["page"], 1)
+        self.assertEqual(result["page_size"], 100)
         self.assertEqual(len(rows), 1)
         row = rows[0]
         self.assertEqual(row["kode_trafo"], "T-A")
@@ -92,13 +96,28 @@ class MeterDataServiceTest(unittest.TestCase):
 
     def test_filters_by_gi_trafo_and_month(self):
         with app.app_context():
-            rows = list_meter_data(
+            result = list_meter_data(
                 gi_id=self.gi_b,
                 trafo_id=self.trafo_b,
                 month="2025-06",
             )
+        rows = result["rows"]
         self.assertEqual([row["kode_trafo"] for row in rows], ["T-B"])
         self.assertEqual(rows[0]["nama_gi"], "GI Meter B")
+
+    def test_paginates_and_caps_page_size(self):
+        with app.app_context():
+            first_page = list_meter_data(page=1, page_size=1)
+            second_page = list_meter_data(page=2, page_size=1)
+            capped = list_meter_data(page_size=999)
+
+        self.assertEqual(first_page["total"], 2)
+        self.assertEqual(first_page["page_size"], 1)
+        self.assertEqual(first_page["pages"], 2)
+        self.assertTrue(first_page["has_next"])
+        self.assertEqual(len(first_page["rows"]), 1)
+        self.assertEqual(len(second_page["rows"]), 1)
+        self.assertEqual(capped["page_size"], 500)
 
     def test_feeder_and_meter_reuse_same_filter_error(self):
         self.assertIs(FeederDataServiceError, ReadingFilterError)

@@ -45,6 +45,19 @@ class FeederDataRouteTest(unittest.TestCase):
                 self.assertEqual(response.status_code, 400)
                 self.assertEqual(response.get_json(), {"error": message})
 
+    def test_pagination_parameters_are_validated_and_capped(self):
+        invalid = self.client.get("/api/feeder-data?page=abc")
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.get_json(), {"error": "Page harus berupa angka positif."})
+
+        response = self.client.get("/api/feeder-data?page=1&page_size=999")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIn("rows", payload)
+        self.assertIn("total", payload)
+        self.assertEqual(payload["page"], 1)
+        self.assertEqual(payload["page_size"], 500)
+
     def test_route_is_registered_once_and_removed_from_monolith(self):
         rules = [
             rule

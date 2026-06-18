@@ -13,6 +13,7 @@ class MigrationSchemaCheckTest(unittest.TestCase):
         self.assertEqual(differences["missing_columns"], {})
         self.assertEqual(differences["missing_uniques"], {})
         self.assertEqual(differences["missing_foreign_keys"], {})
+        self.assertEqual(differences["missing_indexes"], {})
 
 
 if __name__ == "__main__":

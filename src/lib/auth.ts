@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, apiErrorMessage, APP_LOGIN_PATH, clearCsrfToken, FLASK_LOGIN_PATH, FLASK_LOGOUT_PATH, getCsrfToken } from "@/lib/api";
 import type { User } from "@/types";
 
-type AuthState = {
+export type AuthState = {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -12,12 +12,12 @@ type AuthState = {
   refresh: () => Promise<User | null>;
 };
 
-type UseAuthOptions = {
+export type UseAuthOptions = {
   redirectTo?: string;
   redirectIfFound?: string;
 };
 
-type LoginPayload = {
+export type LoginPayload = {
   username: string;
   password: string;
   next?: string;

@@ -5,6 +5,7 @@ import { Alert, Button, Descriptions, List, Modal, Progress, Upload, Typography 
 import type { UploadFile, UploadProps } from "antd";
 import { FileSpreadsheet, UploadCloud } from "lucide-react";
 import { api, apiErrorMessage } from "@/lib/api";
+import { isRecord, toNumber } from "@/lib/normalizers";
 import type { FeederFilters } from "@/hooks/useFeederData";
 import styles from "./penyulang.module.css";
 
@@ -25,19 +26,6 @@ type UploadResult = {
   alertCount: number;
   errors: string[];
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function toNumber(value: unknown, fallback = 0) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-  return fallback;
-}
 
 function monthParam(period: string) {
   return `${period.slice(0, 4)}-${period.slice(4, 6)}`;

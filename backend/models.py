@@ -309,6 +309,9 @@ class MeterReading(db.Model):
     __tablename__ = 'meter_reading'
     __table_args__ = (
         db.UniqueConstraint('trafo_id', 'periode_bulan', name='uq_meter_trafo_bulan'),
+        db.Index('ix_meter_reading_periode_bulan', 'periode_bulan'),
+        db.Index('ix_meter_reading_gi_periode_bulan', 'gi_id', 'periode_bulan'),
+        db.Index('ix_meter_reading_trafo_periode_bulan', 'trafo_id', 'periode_bulan'),
     )
 
     id              = db.Column(db.Integer, primary_key=True)
@@ -397,6 +400,9 @@ class FeederReading(db.Model):
     __table_args__ = (
         db.UniqueConstraint('penyulang_id', 'periode_bulan',
                             name='uq_feeder_penyulang_bulan'),
+        db.Index('ix_feeder_reading_periode_bulan', 'periode_bulan'),
+        db.Index('ix_feeder_reading_gi_periode_bulan', 'gi_id', 'periode_bulan'),
+        db.Index('ix_feeder_reading_trafo_periode_bulan', 'trafo_id', 'periode_bulan'),
     )
 
     id              = db.Column(db.Integer, primary_key=True)

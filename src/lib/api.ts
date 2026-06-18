@@ -15,7 +15,6 @@ declare module "axios" {
 }
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-const CSRF_STORAGE_KEY = "pln_susut_csrf_token";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "/flask-api";
 export const FLASK_LOGIN_PATH = process.env.NEXT_PUBLIC_FLASK_LOGIN_PATH || "/flask-login";
@@ -30,29 +29,12 @@ function isBrowser() {
   return typeof window !== "undefined";
 }
 
-function readStoredCsrfToken() {
-  if (!isBrowser()) return null;
-  if (csrfTokenMemory) return csrfTokenMemory;
-  try {
-    csrfTokenMemory = window.localStorage.getItem(CSRF_STORAGE_KEY);
-  } catch {
-    csrfTokenMemory = null;
-  }
+function readCsrfToken() {
   return csrfTokenMemory;
 }
 
 function storeCsrfToken(token: string | null) {
   csrfTokenMemory = token;
-  if (!isBrowser()) return;
-  try {
-    if (token) {
-      window.localStorage.setItem(CSRF_STORAGE_KEY, token);
-    } else {
-      window.localStorage.removeItem(CSRF_STORAGE_KEY);
-    }
-  } catch {
-    // Ignore storage failures; the in-memory token still works for this tab.
-  }
 }
 
 async function fetchCsrfToken() {
@@ -84,7 +66,7 @@ async function fetchCsrfToken() {
 
 export async function getCsrfToken(options: { force?: boolean } = {}) {
   if (!options.force) {
-    const existing = readStoredCsrfToken();
+    const existing = readCsrfToken();
     if (existing) return existing;
   }
 
@@ -160,8 +142,11 @@ api.interceptors.response.use(
       return api.request(config);
     }
 
-    if (error.response?.status === 401 && isBrowser() && !config?.skipAuthRedirect) {
-      window.location.assign(getRedirectTarget());
+    if (error.response?.status === 401) {
+      clearCsrfToken();
+      if (isBrowser() && !config?.skipAuthRedirect) {
+        window.location.assign(getRedirectTarget());
+      }
     }
 
     return Promise.reject(error);

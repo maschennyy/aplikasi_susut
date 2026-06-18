@@ -9,20 +9,15 @@ from .config import Config
 from .core.auth import (
     current_user as _current_user,
     logout_user as _logout_user,
-    safe_commit_audit as _safe_commit_audit,
     validate_csrf as _validate_csrf,
 )
 from .core.constants import (
-    ALLOWED_GENERIC_UPLOADS,
-    ALLOWED_NKWH_UPLOADS,
     PUBLIC_ENDPOINTS,
     SAFE_METHODS,
     WRITE_ROLES,
-    XLS_SIGNATURE,
 )
 from .core.security import (
     audit as _audit,
-    client_ip as _client_ip,
     json_error as _json_error,
     request_payload as _request_payload,
     validate_password_policy as _validate_password_policy,
@@ -31,9 +26,7 @@ from .models import (db, GarduInduk, Trafo, Penyulang,
                      MeterReading, FeederReading,
                      TransferAntarUnit, RekapBulanan,
                      EximRule, EximMonthlyResult,
-                     User, AuditLog, AreaUnit,
-                     KwhJual)
-from .nkwh_excel import analyze_workbook, parse_nkwh_feeders, parse_exim_rows
+                     User, AuditLog, AreaUnit)
 from .routes.system import system_bp
 from .routes.auth import auth_bp
 from .routes.dashboard import dashboard_bp
@@ -44,20 +37,19 @@ from .routes.profile import profile_bp
 from .routes.security import security_bp
 from .routes.upload import upload_bp
 from .routes.workflow import workflow_bp
+from .routes.kwh_jual import kwh_jual_bp
 from .routes.penyulang_area import register_penyulang_area_route
 from sqlalchemy import func, text, inspect
 from sqlalchemy import and_
-from collections import defaultdict, deque
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from werkzeug.utils import secure_filename
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 import click
 import io
-import pandas as pd
 import os
 
 app = Flask(__name__, static_folder=None)
@@ -85,95 +77,37 @@ app.register_blueprint(profile_bp)
 app.register_blueprint(security_bp)
 app.register_blueprint(upload_bp)
 app.register_blueprint(workflow_bp)
+app.register_blueprint(kwh_jual_bp)
 
 # ════════════════════════════════════════════════
 # KONFIGURASI DATA LOKAL
 # ════════════════════════════════════════════════
 
-UPLOAD_EVENTS = defaultdict(deque)
-
-KWH_JUAL_GROUP_LABELS = {
-    'S': 'Sosial',
-    'R': 'Rumah Tangga',
-    'B': 'Bisnis',
-    'I': 'Industri',
-    'P': 'Pemerintah',
-    'TCL': 'T/C/L Khusus',
-}
-KWH_JUAL_CATALOG = [
-    {'group': 'S', 'golongan': 'S', 'sub_golongan': 'S.1 / 450 VA', 'tegangan': 'TR'},
-    {'group': 'S', 'golongan': 'S', 'sub_golongan': 'S.1 / 900 VA', 'tegangan': 'TR'},
-    {'group': 'S', 'golongan': 'S', 'sub_golongan': 'S.1 / 1.300 VA', 'tegangan': 'TR'},
-    {'group': 'S', 'golongan': 'S', 'sub_golongan': 'S.1 / 2.200 VA', 'tegangan': 'TR'},
-    {'group': 'S', 'golongan': 'S', 'sub_golongan': 'S.1 / 3.500 VA s.d 200 kVA', 'tegangan': 'TR'},
-    {'group': 'S', 'golongan': 'S', 'sub_golongan': 'S.2 / > 200 kVA s.d < 30.000 kVA', 'tegangan': 'TM'},
-    {'group': 'R', 'golongan': 'R', 'sub_golongan': 'R.1 / 450 VA', 'tegangan': 'TR'},
-    {'group': 'R', 'golongan': 'R', 'sub_golongan': 'R.1 / 900 VA', 'tegangan': 'TR'},
-    {'group': 'R', 'golongan': 'R', 'sub_golongan': 'R.1M / 900 VA', 'tegangan': 'TR'},
-    {'group': 'R', 'golongan': 'R', 'sub_golongan': 'R.1 / 1.300 VA', 'tegangan': 'TR'},
-    {'group': 'R', 'golongan': 'R', 'sub_golongan': 'R.1 / 2.200 VA', 'tegangan': 'TR'},
-    {'group': 'R', 'golongan': 'R', 'sub_golongan': 'R.2 / 3.500 VA s.d 5.500 VA', 'tegangan': 'TR'},
-    {'group': 'R', 'golongan': 'R', 'sub_golongan': 'R.3 / 6.600 VA s.d 200 kVA', 'tegangan': 'TR'},
-    {'group': 'R', 'golongan': 'R', 'sub_golongan': 'R.3 / > 200 kVA s.d < 30.000 kVA', 'tegangan': 'TM'},
-    {'group': 'B', 'golongan': 'B', 'sub_golongan': 'B.1 / 450 VA', 'tegangan': 'TR'},
-    {'group': 'B', 'golongan': 'B', 'sub_golongan': 'B.1 / 900 VA', 'tegangan': 'TR'},
-    {'group': 'B', 'golongan': 'B', 'sub_golongan': 'B.1 / 1.300 VA', 'tegangan': 'TR'},
-    {'group': 'B', 'golongan': 'B', 'sub_golongan': 'B.1 / 2.200 VA s.d 5.500 VA', 'tegangan': 'TR'},
-    {'group': 'B', 'golongan': 'B', 'sub_golongan': 'B.2 / 6.600 VA s.d 200 kVA', 'tegangan': 'TR'},
-    {'group': 'B', 'golongan': 'B', 'sub_golongan': 'B.3 / > 200 kVA s.d < 30.000 kVA', 'tegangan': 'TM'},
-    {'group': 'B', 'golongan': 'B', 'sub_golongan': 'B.3 / 30.000 kVA keatas', 'tegangan': 'TT'},
-    {'group': 'I', 'golongan': 'I', 'sub_golongan': 'I.1 / 450 VA', 'tegangan': 'TR'},
-    {'group': 'I', 'golongan': 'I', 'sub_golongan': 'I.1 / 900 VA', 'tegangan': 'TR'},
-    {'group': 'I', 'golongan': 'I', 'sub_golongan': 'I.1 / 1.300 VA', 'tegangan': 'TR'},
-    {'group': 'I', 'golongan': 'I', 'sub_golongan': 'I.1 / 2.200 VA', 'tegangan': 'TR'},
-    {'group': 'I', 'golongan': 'I', 'sub_golongan': 'I.1 / 3.500 s.d 14 kVA', 'tegangan': 'TR'},
-    {'group': 'I', 'golongan': 'I', 'sub_golongan': 'I.2 / > 14 kVA s.d 200 kVA', 'tegangan': 'TR'},
-    {'group': 'I', 'golongan': 'I', 'sub_golongan': 'I.3 / > 200 kVA', 'tegangan': 'TM'},
-    {'group': 'I', 'golongan': 'I', 'sub_golongan': 'I.4 / 30.000 kVA keatas', 'tegangan': 'TT'},
-    {'group': 'P', 'golongan': 'P', 'sub_golongan': 'P.1 / 450 VA', 'tegangan': 'TR'},
-    {'group': 'P', 'golongan': 'P', 'sub_golongan': 'P.1 / 900 VA', 'tegangan': 'TR'},
-    {'group': 'P', 'golongan': 'P', 'sub_golongan': 'P.1 / 1.300 VA', 'tegangan': 'TR'},
-    {'group': 'P', 'golongan': 'P', 'sub_golongan': 'P.1 / 2.200 VA s.d 5.500 VA', 'tegangan': 'TR'},
-    {'group': 'P', 'golongan': 'P', 'sub_golongan': 'P.1 / 6.600 VA s.d 200 kVA', 'tegangan': 'TR'},
-    {'group': 'P', 'golongan': 'P', 'sub_golongan': 'P.2 / > 200 kVA', 'tegangan': 'TM'},
-    {'group': 'P', 'golongan': 'P', 'sub_golongan': 'P.3 (khusus)', 'tegangan': 'TT'},
-    {'group': 'TCL', 'golongan': 'T', 'sub_golongan': 'T / TM > 200 kVA s.d < 30.000 kVA', 'tegangan': 'TM'},
-    {'group': 'TCL', 'golongan': 'T', 'sub_golongan': 'T / TT 30.000 kVA keatas', 'tegangan': 'TT'},
-    {'group': 'TCL', 'golongan': 'C', 'sub_golongan': 'C / TR s.d 200 kVA', 'tegangan': 'TR'},
-    {'group': 'TCL', 'golongan': 'C', 'sub_golongan': 'C / TM > 200 kVA s.d < 30.000 kVA', 'tegangan': 'TM'},
-    {'group': 'TCL', 'golongan': 'C', 'sub_golongan': 'C / TT 30.000 kVA keatas', 'tegangan': 'TT'},
-    {'group': 'TCL', 'golongan': 'L', 'sub_golongan': 'L / TR s.d 200 kVA', 'tegangan': 'TR'},
-    {'group': 'TCL', 'golongan': 'L', 'sub_golongan': 'L / TM > 200 kVA s.d < 30.000 kVA', 'tegangan': 'TM'},
-    {'group': 'TCL', 'golongan': 'L', 'sub_golongan': 'L / TT 30.000 kVA keatas', 'tegangan': 'TT'},
-]
-KWH_JUAL_SUB_INDEX = {item['sub_golongan']: item for item in KWH_JUAL_CATALOG}
-
-
-def _prune_events(events, window_minutes):
-    cutoff = datetime.utcnow() - timedelta(minutes=window_minutes)
-    while events and events[0] < cutoff:
-        events.popleft()
-
-
-def _rate_limited(bucket, key, limit, window_minutes):
-    events = bucket[key]
-    _prune_events(events, window_minutes)
-    return len(events) >= limit
-
-
-def _record_rate_event(bucket, key, window_minutes):
-    events = bucket[key]
-    _prune_events(events, window_minutes)
-    events.append(datetime.utcnow())
-
-
-def _upload_rate_key():
-    user = getattr(g, 'current_user', None)
-    return f'{user.id if user else "anon"}:{_client_ip()}'
-
-
 def _next_month(period):
     return date(period.year + 1, 1, 1) if period.month == 12 else date(period.year, period.month + 1, 1)
+
+
+def _month_date(value, fallback=None):
+    if value is None or str(value).strip() == '':
+        if fallback:
+            year, month = fallback.split('-')[:2]
+            return date(int(year), int(month), 1)
+        raise ValueError('Kolom bulan/periode wajib diisi')
+    if isinstance(value, datetime):
+        return date(value.year, value.month, 1)
+    if isinstance(value, date):
+        return date(value.year, value.month, 1)
+
+    raw = str(value).strip()
+    if len(raw) == 7 and raw[4] == '-':
+        return date(int(raw[:4]), int(raw[5:7]), 1)
+    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%m/%Y', '%m-%Y'):
+        try:
+            parsed = datetime.strptime(raw, fmt)
+            return date(parsed.year, parsed.month, 1)
+        except ValueError:
+            continue
+    raise ValueError(f'Format bulan tidak dikenali: {raw}')
 
 
 def _report_period_bounds(default_month=False):
@@ -578,44 +512,6 @@ def _report_file_response(module, fmt):
         )
 
 
-def _check_upload_rate():
-    key = _upload_rate_key()
-    if _rate_limited(
-        UPLOAD_EVENTS,
-        key,
-        app.config.get('UPLOAD_RATE_LIMIT', 10),
-        app.config.get('UPLOAD_RATE_WINDOW_MINUTES', 10),
-    ):
-        raise ValueError('Terlalu banyak upload dalam waktu singkat. Coba lagi beberapa menit lagi.')
-    _record_rate_event(UPLOAD_EVENTS, key, app.config.get('UPLOAD_RATE_WINDOW_MINUTES', 10))
-
-
-def _extension(filename):
-    return secure_filename(filename or '').rsplit('.', 1)[-1].lower() if '.' in (filename or '') else ''
-
-
-def _validate_upload_file(file, allowed_extensions):
-    filename = secure_filename(file.filename or '')
-    ext = _extension(filename)
-    if not filename:
-        raise ValueError('Nama file kosong.')
-    if ext not in allowed_extensions:
-        allowed = ', '.join(sorted(allowed_extensions))
-        raise ValueError(f'Format file tidak diizinkan. Gunakan: {allowed}.')
-    if request.content_length and request.content_length > app.config['MAX_CONTENT_LENGTH']:
-        max_mb = app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
-        raise ValueError(f'Ukuran file melebihi batas {max_mb} MB.')
-
-    pos = file.stream.tell()
-    head = file.stream.read(8)
-    file.stream.seek(pos)
-    if ext in {'xlsx', 'xlsm'} and not head.startswith(b'PK'):
-        raise ValueError('File Excel tidak valid atau rusak.')
-    if ext == 'xls' and head != XLS_SIGNATURE:
-        raise ValueError('File XLS tidak valid atau rusak.')
-    return filename, ext
-
-
 @app.before_request
 def apply_security_gate():
     g.current_user = _current_user()
@@ -746,517 +642,7 @@ def api_rekap():
 
 
 # ════════════════════════════════════════════════
-# API — UPLOAD (placeholder, lengkap di Sesi 2)
 # ════════════════════════════════════════════════
-
-def _shift_month(period, offset):
-    month_index = period.year * 12 + period.month - 1 + offset
-    return date(month_index // 12, month_index % 12 + 1, 1)
-
-
-def _kwh_jual_catalog_payload():
-    return {
-        'groups': KWH_JUAL_GROUP_LABELS,
-        'rows': KWH_JUAL_CATALOG,
-    }
-
-
-def _kwh_jual_payload(gi_id, period):
-    q = KwhJual.query.filter(KwhJual.periode_bulan == period)
-    if gi_id:
-        q = q.filter(KwhJual.gi_id == gi_id)
-
-    values_by_sub = defaultdict(float)
-    for row in q.all():
-        if row.sub_golongan in KWH_JUAL_SUB_INDEX:
-            values_by_sub[row.sub_golongan] += _float_value(row.kwh)
-
-    per_golongan = {key: 0 for key in KWH_JUAL_GROUP_LABELS}
-    per_tegangan = {'TR': 0, 'TM': 0, 'TT': 0}
-    detail = []
-    for item in KWH_JUAL_CATALOG:
-        kwh = values_by_sub.get(item['sub_golongan'], 0)
-        per_golongan[item['group']] += kwh
-        per_tegangan[item['tegangan']] += kwh
-        detail.append({
-            'group': item['group'],
-            'group_label': KWH_JUAL_GROUP_LABELS[item['group']],
-            'golongan': item['golongan'],
-            'sub_golongan': item['sub_golongan'],
-            'tegangan': item['tegangan'],
-            'kwh': round(kwh, 3),
-        })
-
-    total = sum(per_tegangan.values())
-    return {
-        'periode': period.strftime('%Y-%m'),
-        'periode_bulan': period.strftime('%Y-%m-%d'),
-        'gi_id': gi_id,
-        'catalog': _kwh_jual_catalog_payload(),
-        'detail': detail,
-        'per_golongan': {key: round(value, 3) for key, value in per_golongan.items()},
-        'per_tegangan': {key: round(value, 3) for key, value in per_tegangan.items()},
-        'total': round(total, 3),
-        'trend': _kwh_jual_trend(gi_id, period),
-    }
-
-
-def _kwh_jual_trend(gi_id, period):
-    start = _shift_month(period, -5)
-    end = _next_month(period)
-    q = KwhJual.query.filter(
-        KwhJual.periode_bulan >= start,
-        KwhJual.periode_bulan < end,
-    )
-    if gi_id:
-        q = q.filter(KwhJual.gi_id == gi_id)
-    monthly = {
-        _shift_month(start, index).strftime('%Y-%m'): {'total': 0, 'TR': 0, 'TM': 0, 'TT': 0}
-        for index in range(6)
-    }
-    for row in q.all():
-        key = row.periode_bulan.strftime('%Y-%m')
-        if key not in monthly:
-            continue
-        value = _float_value(row.kwh)
-        monthly[key]['total'] += value
-        if row.tegangan in {'TR', 'TM', 'TT'}:
-            monthly[key][row.tegangan] += value
-    return [
-        {'periode': key, **{name: round(value, 3) for name, value in values.items()}}
-        for key, values in monthly.items()
-    ]
-
-
-@app.route('/api/kwh-jual', methods=['GET', 'POST'])
-def api_kwh_jual():
-    try:
-        if request.method == 'GET':
-            gi_id = request.args.get('gi_id', type=int)
-            bulan = (request.args.get('bulan') or request.args.get('periode') or '').strip()
-            period = _month_date(bulan or date.today().strftime('%Y-%m'))
-            return jsonify(_kwh_jual_payload(gi_id, period))
-
-        denied = _master_writer_required()
-        if denied:
-            return denied
-        payload = _request_payload()
-        gi_id = int(payload.get('gi_id') or 0)
-        gi = db.session.get(GarduInduk, gi_id)
-        if not gi:
-            return _json_error('Gardu induk wajib dipilih.', 400)
-        period = _month_date(payload.get('bulan') or payload.get('periode') or payload.get('periode_bulan'))
-        entries = payload.get('entries') or payload.get('detail') or []
-        if not isinstance(entries, list):
-            return _json_error('Format entries tidak valid.', 400)
-
-        saved = 0
-        total = Decimal('0')
-        for item in entries:
-            sub = _clean_value(item.get('sub_golongan'))
-            catalog = KWH_JUAL_SUB_INDEX.get(sub)
-            if not catalog:
-                return _json_error(f'Sub-golongan tidak dikenali: {sub}', 400)
-            kwh = Decimal(str(item.get('kwh') or 0))
-            if kwh < 0:
-                return _json_error(f'Nilai kWh tidak boleh negatif: {sub}', 400)
-            row = KwhJual.query.filter_by(
-                gi_id=gi.id,
-                periode_bulan=period,
-                sub_golongan=sub,
-            ).first()
-            if not row:
-                row = KwhJual(
-                    gi_id=gi.id,
-                    periode_bulan=period,
-                    sub_golongan=sub,
-                )
-                db.session.add(row)
-            row.golongan = catalog['golongan']
-            row.tegangan = catalog['tegangan']
-            row.kwh = kwh
-            saved += 1
-            total += kwh
-
-        _audit('UPSERT_KWH_JUAL', entity_type='kwh_jual', entity_id=f'{gi.id}:{period:%Y-%m}', detail={
-            'gi_id': gi.id,
-            'kode_gi': gi.kode_gi,
-            'periode_bulan': period.strftime('%Y-%m-%d'),
-            'rows': saved,
-            'total_kwh': float(total),
-        })
-        db.session.commit()
-        return jsonify(_kwh_jual_payload(gi.id, period))
-    except ValueError as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-def _norm_col(value):
-    return ''.join(ch for ch in str(value).strip().lower() if ch.isalnum())
-
-
-def _pick(row, aliases, default=None):
-    for alias in aliases:
-        key = _norm_col(alias)
-        if key in row and pd.notna(row[key]) and str(row[key]).strip() != '':
-            return row[key]
-    return default
-
-
-def _num(value, default=0):
-    if value is None or pd.isna(value) or str(value).strip() == '':
-        return default
-    text_value = str(value).replace('.', '').replace(',', '.') if isinstance(value, str) else value
-    try:
-        return float(text_value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _str_value(value, default=''):
-    if value is None or pd.isna(value):
-        return default
-    return str(value).strip()
-
-
-def _month_date(value, fallback=None):
-    if value is None or pd.isna(value) or str(value).strip() == '':
-        if fallback:
-            year, month = fallback.split('-')[:2]
-            return date(int(year), int(month), 1)
-        raise ValueError('Kolom bulan/periode wajib diisi')
-    if hasattr(value, 'year') and hasattr(value, 'month'):
-        return date(int(value.year), int(value.month), 1)
-    raw = str(value).strip()
-    if len(raw) == 7 and raw[4] == '-':
-        return date(int(raw[:4]), int(raw[5:7]), 1)
-    parsed = pd.to_datetime(raw, errors='coerce', dayfirst=True)
-    if pd.isna(parsed):
-        raise ValueError(f'Format bulan tidak dikenali: {raw}')
-    return date(int(parsed.year), int(parsed.month), 1)
-
-
-def _previous_month(period):
-    return date(period.year - 1, 12, 1) if period.month == 1 else date(period.year, period.month - 1, 1)
-
-
-def _read_upload_table(file):
-    _validate_upload_file(file, ALLOWED_GENERIC_UPLOADS)
-    filename = file.filename.lower()
-    if filename.endswith(('.xlsx', '.xlsm', '.xls')):
-        frame = pd.read_excel(file)
-    elif filename.endswith('.csv'):
-        frame = pd.read_csv(file)
-    else:
-        raise ValueError('Format file harus CSV atau Excel (.xlsx/.xls)')
-    frame = frame.dropna(how='all')
-    if len(frame) > app.config['MAX_IMPORT_ROWS']:
-        raise ValueError(f'Jumlah baris melebihi batas {app.config["MAX_IMPORT_ROWS"]}.')
-    frame.columns = [_norm_col(col) for col in frame.columns]
-    return frame
-
-
-def _find_or_create_gi(row, default_gi_id):
-    if default_gi_id:
-        gi = GarduInduk.query.get(default_gi_id)
-        if gi:
-            return gi
-    kode = _str_value(_pick(row, ['kode_gi', 'kode gardu induk', 'gi']), '')
-    nama = _str_value(_pick(row, ['nama_gi', 'gardu_induk', 'gardu induk', 'nama gardu induk']), kode)
-    if not kode and not nama:
-        raise ValueError('GI tidak ditemukan. Isi kode_gi/nama_gi atau pilih default GI.')
-    gi = GarduInduk.query.filter(
-        (GarduInduk.kode_gi == kode) | (GarduInduk.nama_gi == nama)
-    ).first()
-    if gi:
-        return gi
-    gi = GarduInduk(kode_gi=kode or nama[:20].upper(), nama_gi=nama or kode, aktif=True)
-    db.session.add(gi)
-    db.session.flush()
-    return gi
-
-
-def _find_or_create_trafo(row, gi, default_trafo_id):
-    if default_trafo_id:
-        trafo = Trafo.query.get(default_trafo_id)
-        if trafo:
-            return trafo
-    kode = _str_value(_pick(row, ['kode_trafo', 'trafo', 'kode trafo']), '')
-    nama = _str_value(_pick(row, ['nama_trafo', 'nama trafo']), kode or 'Trafo 1')
-    if not kode:
-        kode = 'TRF-1'
-    trafo = Trafo.query.filter_by(gi_id=gi.id, kode_trafo=kode).first()
-    if trafo:
-        return trafo
-    trafo = Trafo(
-        gi_id=gi.id,
-        kode_trafo=kode,
-        nama_trafo=nama or kode,
-        kapasitas_mva=Decimal('0'),
-        tegangan_kv=Decimal('20'),
-        aktif=True,
-    )
-    db.session.add(trafo)
-    db.session.flush()
-    return trafo
-
-
-def _find_or_create_penyulang(row, gi, trafo):
-    kode = _str_value(_pick(row, ['kode_penyulang', 'kode penyulang', 'kode', 'penyulang']), '')
-    nama = _str_value(_pick(row, ['nama_penyulang', 'nama penyulang', 'nama', 'feeder']), kode)
-    if not kode:
-        raise ValueError('kode_penyulang wajib diisi')
-    penyulang = Penyulang.query.filter_by(trafo_id=trafo.id, kode_penyulang=kode).first()
-    if not penyulang:
-        penyulang = Penyulang(
-            trafo_id=trafo.id,
-            gi_id=gi.id,
-            kode_penyulang=kode,
-            nama_penyulang=nama or kode,
-            aktif=True,
-        )
-        db.session.add(penyulang)
-    penyulang.nama_penyulang = nama or penyulang.nama_penyulang
-    penyulang.jenis = _str_value(_pick(row, ['jenis', 'jenis_penyulang'], penyulang.jenis or 'REGULAR'), 'REGULAR').upper()
-    penyulang.area_up3 = _str_value(_pick(row, ['area_up3', 'area', 'up3', 'area up3'], penyulang.area_up3), penyulang.area_up3)
-    penyulang.ex_cabang = _str_value(_pick(row, ['ex_cabang', 'ex cabang', 'cabang'], penyulang.ex_cabang), penyulang.ex_cabang)
-    penyulang.status = _str_value(_pick(row, ['status', 'status_penyulang', 'status penyulang'], penyulang.status or 'AKTIF'), 'AKTIF').upper()
-    penyulang.aktif = penyulang.status not in {'NONAKTIF', 'OFF', 'PADAM PERMANEN'}
-    db.session.flush()
-    return penyulang
-
-
-def _reading_values(row):
-    faktor = _num(_pick(row, ['faktor_kali', 'faktor', 'fk']), 1) or 1
-    stand_awal = _num(_pick(row, ['stand_awal', 'stand awal', 'awal']), 0)
-    stand_akhir = _num(_pick(row, ['stand_akhir', 'stand akhir', 'akhir']), 0)
-    wbp = _num(_pick(row, ['kwh_wbp', 'wbp']), 0)
-    lwbp1 = _num(_pick(row, ['kwh_lwbp1', 'lwbp1', 'lwbp', 'lwbp_1']), 0)
-    lwbp2 = _num(_pick(row, ['kwh_lwbp2', 'lwbp2', 'lwbp_2']), 0)
-    total = _num(_pick(row, ['kwh_total', 'total_kwh', 'total kwh', 'total']), 0)
-
-    if stand_akhir and faktor and not any([wbp, lwbp1, lwbp2, total]):
-        total = max(0, (stand_akhir - stand_awal) * faktor)
-        wbp, lwbp1, lwbp2 = total, 0, 0
-    elif total and not any([wbp, lwbp1, lwbp2]):
-        wbp, lwbp1, lwbp2 = total, 0, 0
-    else:
-        total = wbp + lwbp1 + lwbp2
-
-    return stand_awal, stand_akhir, faktor, wbp, lwbp1, lwbp2, total
-
-
-def _set_anomaly(reading, threshold_pct, min_delta):
-    previous = FeederReading.query.filter_by(
-        penyulang_id=reading.penyulang_id,
-        periode_bulan=_previous_month(reading.periode_bulan)
-    ).first()
-    reading.flag_alert = False
-    reading.deviasi_persen = Decimal('0')
-    reading.anomaly_type = None
-    reading.catatan = None
-    if not previous or previous.kwh_total <= 0:
-        return
-    delta = reading.kwh_total - previous.kwh_total
-    pct = (delta / previous.kwh_total) * 100
-    if abs(delta) >= min_delta and abs(pct) >= threshold_pct:
-        reading.flag_alert = True
-        reading.deviasi_persen = Decimal(str(round(pct, 2)))
-        reading.anomaly_type = 'NAIK' if delta > 0 else 'TURUN'
-        reading.catatan = (
-            f'Anomali {reading.anomaly_type.lower()} {round(pct, 2)}% '
-            f'dari bulan sebelumnya ({round(previous.kwh_total)} ke {round(reading.kwh_total)} kWh).'
-        )
-
-
-def _slug_code(value, fallback='DATA', max_len=30):
-    raw = _str_value(value, fallback).upper()
-    code = ''.join(ch if ch.isalnum() else '-' for ch in raw)
-    code = '-'.join(part for part in code.split('-') if part)
-    return (code or fallback)[:max_len]
-
-
-def _decimal_or_none(value):
-    if value is None:
-        return None
-    return Decimal(str(value))
-
-
-def _decimal_or_zero(value):
-    return Decimal(str(value or 0))
-
-
-def _nkwh_period(value, fallback=None):
-    if value:
-        return date.fromisoformat(value)
-    if fallback:
-        return _month_date(fallback)
-    raise ValueError('Periode bulan tidak ditemukan dari workbook. Isi default bulan saat import.')
-
-
-def _find_or_create_gi_from_name(name):
-    nama = _str_value(name, 'Belum Dipetakan')
-    kode = _slug_code(nama, 'GI', 20)
-    gi = GarduInduk.query.filter(
-        (GarduInduk.kode_gi == kode) | (GarduInduk.nama_gi == nama)
-    ).first()
-    if gi:
-        return gi
-    gi = GarduInduk(kode_gi=kode, nama_gi=nama, aktif=True)
-    db.session.add(gi)
-    db.session.flush()
-    return gi
-
-
-def _find_or_create_trafo_from_nkwh(gi, kode_trafo, nama_trafo):
-    raw = _str_value(kode_trafo, 'TRF-1')
-    raw_upper = raw.upper()
-    kode = raw_upper if raw_upper.startswith('TRF') else f'TRF-{raw_upper}'
-    candidates = {raw_upper, kode, f'{gi.kode_gi}-T{raw_upper}', f'{gi.kode_gi}-{kode}'}
-    trafo = Trafo.query.filter(Trafo.gi_id == gi.id, Trafo.kode_trafo.in_(candidates)).first()
-    if not trafo:
-        trafo = Trafo.query.filter(
-            Trafo.gi_id == gi.id,
-            Trafo.nama_trafo.in_({_str_value(nama_trafo, kode), f'Trafo {raw}'})
-        ).first()
-    if trafo:
-        return trafo
-    trafo = Trafo(
-        gi_id=gi.id,
-        kode_trafo=kode,
-        nama_trafo=_str_value(nama_trafo, kode),
-        kapasitas_mva=Decimal('0'),
-        tegangan_kv=Decimal('20'),
-        aktif=True,
-    )
-    db.session.add(trafo)
-    db.session.flush()
-    return trafo
-
-
-def _find_or_create_penyulang_from_nkwh(item, gi, trafo):
-    kode = _slug_code(item.get('kode_penyulang') or item.get('nama_penyulang'), 'PENYULANG', 30)
-    nama = _str_value(item.get('nama_penyulang'), kode)
-    penyulang = Penyulang.query.filter_by(trafo_id=trafo.id, kode_penyulang=kode).first()
-    if not penyulang:
-        penyulang = Penyulang.query.filter_by(trafo_id=trafo.id, nama_penyulang=nama).first()
-    if not penyulang:
-        penyulang = Penyulang(
-            trafo_id=trafo.id,
-            gi_id=gi.id,
-            kode_penyulang=kode,
-            nama_penyulang=nama,
-            jenis='REGULAR',
-            status='AKTIF',
-            aktif=True,
-        )
-        db.session.add(penyulang)
-    penyulang.gi_id = gi.id
-    penyulang.nama_penyulang = nama or penyulang.nama_penyulang
-    penyulang.status = penyulang.status or 'AKTIF'
-    penyulang.aktif = penyulang.status not in {'NONAKTIF', 'OFF', 'PADAM PERMANEN'}
-    db.session.flush()
-    return penyulang
-
-
-def _apply_nkwh_registers(reading, item):
-    registers = item.get('registers') or {}
-    for prefix in ('wbp', 'lwbp1', 'lwbp2'):
-        detail = registers.get(prefix, {})
-        setattr(reading, f'{prefix}_stand_awal', _decimal_or_none(detail.get('stand_awal')))
-        setattr(reading, f'{prefix}_stand_akhir', _decimal_or_none(detail.get('stand_akhir')))
-        setattr(reading, f'{prefix}_faktor_kali', _decimal_or_none(detail.get('faktor_kali')))
-
-    first_register = next((registers[key] for key in ('wbp', 'lwbp1', 'lwbp2') if key in registers), {})
-    reading.stand_awal = _decimal_or_none(first_register.get('stand_awal'))
-    reading.stand_akhir = _decimal_or_none(first_register.get('stand_akhir'))
-    reading.faktor_kali = _decimal_or_none(first_register.get('faktor_kali')) or Decimal('1')
-
-    reading.kwh_wbp = _decimal_or_zero(item.get('kwh_wbp'))
-    reading.kwh_lwbp1 = _decimal_or_zero(item.get('kwh_lwbp1'))
-    reading.kwh_lwbp2 = _decimal_or_zero(item.get('kwh_lwbp2'))
-    reading.manual_kwh_wbp = _decimal_or_none(item.get('manual_kwh_wbp'))
-    reading.manual_kwh_lwbp1 = _decimal_or_none(item.get('manual_kwh_lwbp1'))
-    reading.manual_kwh_lwbp2 = _decimal_or_none(item.get('manual_kwh_lwbp2'))
-    reading.source_format = 'NKWH_XLSX'
-    reading.source_sheet = item.get('source_sheet')
-    reading.source_row_start = item.get('source_row_start')
-    reading.source_row_end = item.get('source_row_end')
-
-
-def _import_nkwh_exim_rows(exim_rows, period):
-    imported = updated = 0
-    for row in exim_rows:
-        kode_rule = _slug_code(
-            f"{row.get('gardu_induk')}-{row.get('feeder')}-{row.get('row')}",
-            'EXIM',
-            60
-        )
-        rule = EximRule.query.filter_by(kode_rule=kode_rule).first()
-        if rule:
-            updated += 1
-        else:
-            imported += 1
-            rule = EximRule(kode_rule=kode_rule)
-            db.session.add(rule)
-
-        rule.nama_rule = _str_value(row.get('feeder'), kode_rule)
-        rule.metode = row.get('metode') or 'ADJUSTMENT'
-        rule.up3_asal = row.get('area_asal') or None
-        rule.up3_tujuan = row.get('area_tujuan') or None
-        rule.fungsi = row.get('fungsi') or None
-        rule.arah = row.get('arah') or None
-        rule.periode_mulai = period
-        rule.source_sheet = 'Exim'
-        rule.source_row = row.get('row')
-        rule.catatan = row.get('jenis') or row.get('lokasi')
-        db.session.flush()
-
-        result = EximMonthlyResult.query.filter_by(
-            rule_id=rule.id,
-            periode_bulan=period,
-            up3_tujuan=rule.up3_tujuan,
-        ).first()
-        if not result:
-            result = EximMonthlyResult(
-                rule_id=rule.id,
-                periode_bulan=period,
-            )
-            db.session.add(result)
-
-        basis = row.get('kwh_penyulang_basis') or 0
-        transfer = row.get('kwh_total') or sum([
-            row.get('kwh_wbp') or 0,
-            row.get('kwh_lwbp1') or 0,
-            row.get('kwh_lwbp2') or 0,
-        ])
-        result.metode = rule.metode
-        result.up3_asal = rule.up3_asal
-        result.up3_tujuan = rule.up3_tujuan
-        result.fungsi = rule.fungsi
-        result.arah = rule.arah
-        result.kwh_basis = _decimal_or_zero(basis)
-        result.kwh_wbp = _decimal_or_zero(row.get('kwh_wbp'))
-        result.kwh_lwbp1 = _decimal_or_zero(row.get('kwh_lwbp1'))
-        result.kwh_lwbp2 = _decimal_or_zero(row.get('kwh_lwbp2'))
-        result.kwh_transfer = _decimal_or_zero(transfer)
-        result.porsi = _decimal_or_none(transfer / basis) if basis else None
-        result.source_sheet = 'Exim'
-        result.source_row = row.get('row')
-        result.catatan = row.get('lokasi')
-    return imported, updated
-
-
-def _nkwh_import_blockers(parsed):
-    blockers = []
-    if not parsed.get('feeder_count'):
-        blockers.append('Tidak ada data penyulang yang bisa diimport.')
-    return blockers
-
 
 # ════════════════════════════════════════════════
 # ERROR HANDLERS

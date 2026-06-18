@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { api, apiErrorMessage } from "@/lib/api";
+import { asArray, asRecord, firstNumber, firstString, periodFromValue } from "@/lib/normalizers";
 
 export type ResourceState<T> = {
   data: T | null;
@@ -104,56 +105,6 @@ const EMPTY_RESOURCE = {
 };
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return isRecord(value) ? value : {};
-}
-
-function asArray(value: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(isRecord);
-}
-
-function toNumber(value: unknown, fallback = 0) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const normalized = value.trim().replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-  return fallback;
-}
-
-function firstNumber(record: Record<string, unknown>, keys: string[], fallback = 0) {
-  for (const key of keys) {
-    if (record[key] !== undefined && record[key] !== null) {
-      return toNumber(record[key], fallback);
-    }
-  }
-  return fallback;
-}
-
-function firstString(record: Record<string, unknown>, keys: string[], fallback = "") {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return fallback;
-}
-
-function periodFromValue(value: unknown, fallbackPeriod: string) {
-  if (typeof value === "string" && /^\d{6}$/.test(value)) {
-    return `${value.slice(0, 4)}-${value.slice(4, 6)}`;
-  }
-  if (typeof value === "string" && /^\d{4}-\d{2}/.test(value)) {
-    return value.slice(0, 7);
-  }
-  return `${fallbackPeriod.slice(0, 4)}-${fallbackPeriod.slice(4, 6)}`;
-}
 
 function monthLabel(periode: string) {
   const monthIndex = Number(periode.slice(5, 7)) - 1;

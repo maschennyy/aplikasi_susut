@@ -15,6 +15,13 @@ def json_error(message, status=400):
     return jsonify({"error": message}), status
 
 
+def require_roles(*roles):
+    user = getattr(g, "current_user", None)
+    if not user or user.role not in roles:
+        return json_error("Akses ditolak.", 403)
+    return None
+
+
 def request_payload():
     if request.is_json:
         return request.get_json(silent=True) or {}

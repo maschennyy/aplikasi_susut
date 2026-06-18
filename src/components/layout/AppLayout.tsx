@@ -39,7 +39,7 @@ function AuthenticatedShell({ children }: AppLayoutProps) {
     );
   }
 
-  if (!auth.isLoggedIn || !auth.user) {
+  if (!auth.isAuthenticated || !auth.user) {
     return null;
   }
 

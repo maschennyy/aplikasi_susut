@@ -27,6 +27,12 @@ class ReadingFilters:
     period_end: date | None
 
 
+@dataclass(frozen=True)
+class PaginationParams:
+    page: int
+    page_size: int
+
+
 def parse_optional_positive_id(value: Any, *, label: str) -> int | None:
     if value in (None, ""):
         return None
@@ -43,6 +49,38 @@ def parse_optional_positive_id(value: Any, *, label: str) -> int | None:
             400,
         )
     return parsed
+
+
+def parse_positive_int(value: Any, *, label: str, default: int) -> int:
+    if value in (None, ""):
+        return default
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise ReadingFilterError(f"{label} harus berupa angka positif.", 400) from exc
+    if parsed <= 0:
+        raise ReadingFilterError(f"{label} harus berupa angka positif.", 400)
+    return parsed
+
+
+def parse_pagination(
+    *,
+    page: Any = None,
+    page_size: Any = None,
+    default_page: int = 1,
+    default_page_size: int = 100,
+    max_page_size: int = 500,
+) -> PaginationParams:
+    parsed_page = parse_positive_int(page, label="Page", default=default_page)
+    parsed_page_size = parse_positive_int(
+        page_size,
+        label="Page size",
+        default=default_page_size,
+    )
+    return PaginationParams(
+        page=parsed_page,
+        page_size=min(parsed_page_size, max_page_size),
+    )
 
 
 def _next_month(period: date) -> date:

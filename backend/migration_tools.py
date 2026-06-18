@@ -12,6 +12,10 @@ def _column_set(columns):
     return tuple(sorted(column.name if hasattr(column, "name") else column for column in columns))
 
 
+def _column_sequence(columns):
+    return tuple(column.name if hasattr(column, "name") else column for column in columns)
+
+
 def schema_differences(db):
     """Compare required model structures with the connected database."""
     inspector = inspect(db.engine)
@@ -23,6 +27,7 @@ def schema_differences(db):
     missing_columns = defaultdict(list)
     missing_uniques = defaultdict(list)
     missing_foreign_keys = defaultdict(list)
+    missing_indexes = defaultdict(list)
 
     for table_name in sorted(expected_tables & actual_tables):
         model_table = db.metadata.tables[table_name]
@@ -61,12 +66,24 @@ def schema_differences(db):
         for foreign_key in sorted(expected_fks - actual_fks):
             missing_foreign_keys[table_name].append(foreign_key)
 
+        expected_indexes = {
+            (index.name, _column_sequence(index.columns))
+            for index in model_table.indexes
+        }
+        actual_indexes = {
+            (item.get("name"), tuple(item.get("column_names") or []))
+            for item in inspector.get_indexes(table_name)
+        }
+        for index_name, columns in sorted(expected_indexes - actual_indexes):
+            missing_indexes[table_name].append((index_name, columns))
+
     return {
         "missing_tables": missing_tables,
         "extra_tables": extra_tables,
         "missing_columns": dict(missing_columns),
         "missing_uniques": dict(missing_uniques),
         "missing_foreign_keys": dict(missing_foreign_keys),
+        "missing_indexes": dict(missing_indexes),
     }
 
 
@@ -80,6 +97,7 @@ def register_migration_commands(app, db):
             "missing_columns",
             "missing_uniques",
             "missing_foreign_keys",
+            "missing_indexes",
         )
         has_blockers = any(differences[key] for key in blocking_keys)
 
@@ -101,10 +119,16 @@ def register_migration_commands(app, db):
                     f"Foreign key tidak ditemukan pada {table}: "
                     f"{', '.join(local_columns)} -> {remote_table}({', '.join(remote_columns)})"
                 )
+        for table, indexes in differences["missing_indexes"].items():
+            for index_name, columns in indexes:
+                click.echo(
+                    f"Index tidak ditemukan pada {table}: "
+                    f"{index_name} ({', '.join(columns)})"
+                )
 
         if has_blockers:
             raise click.ClickException(
                 "Skema database belum sesuai model. Jangan menjalankan db stamp sebelum masalah di atas diperbaiki."
             )
 
-        click.echo("Schema check lulus: tabel, kolom, unique constraint, dan foreign key utama sesuai model.")
+        click.echo("Schema check lulus: tabel, kolom, unique constraint, foreign key, dan index utama sesuai model.")
