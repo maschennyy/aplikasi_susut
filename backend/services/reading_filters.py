@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from ..models import GarduInduk, Trafo, db
+from ..models import GarduInduk, Penyulang, Trafo, db
 
 
 _PERIOD_PATTERN = re.compile(r"^(\d{4})-(\d{2})$")
@@ -23,6 +23,7 @@ class ReadingFilterError(ValueError):
 class ReadingFilters:
     gi_id: int | None
     trafo_id: int | None
+    penyulang_id: int | None
     period_start: date | None
     period_end: date | None
 
@@ -109,12 +110,20 @@ def parse_month_bounds(value: Any) -> tuple[date, date] | None:
     return period, _next_month(period)
 
 
-def validate_gi_trafo_filters(*, gi_id: int | None, trafo_id: int | None) -> None:
+def validate_reading_entity_filters(
+    *,
+    gi_id: int | None,
+    trafo_id: int | None,
+    penyulang_id: int | None,
+) -> None:
     gi = None
+    trafo = None
+
     if gi_id is not None:
         gi = db.session.get(GarduInduk, gi_id)
         if gi is None:
             raise ReadingFilterError("Gardu induk tidak ditemukan.", 404)
+
     if trafo_id is not None:
         trafo = db.session.get(Trafo, trafo_id)
         if trafo is None:
@@ -125,23 +134,45 @@ def validate_gi_trafo_filters(*, gi_id: int | None, trafo_id: int | None) -> Non
                 400,
             )
 
+    if penyulang_id is not None:
+        penyulang = db.session.get(Penyulang, penyulang_id)
+        if penyulang is None:
+            raise ReadingFilterError("Penyulang tidak ditemukan.", 404)
+        if gi is not None and penyulang.gi_id != gi.id:
+            raise ReadingFilterError(
+                "Penyulang tidak berada pada Gardu Induk yang dipilih.",
+                400,
+            )
+        if trafo is not None and penyulang.trafo_id != trafo.id:
+            raise ReadingFilterError(
+                "Penyulang tidak berada pada Trafo yang dipilih.",
+                400,
+            )
+
 
 def parse_reading_filters(
     *,
     gi_id: Any = None,
     trafo_id: Any = None,
+    penyulang_id: Any = None,
     month: Any = "",
 ) -> ReadingFilters:
     parsed_gi_id = parse_optional_positive_id(gi_id, label="GI")
     parsed_trafo_id = parse_optional_positive_id(trafo_id, label="Trafo")
+    parsed_penyulang_id = parse_optional_positive_id(
+        penyulang_id,
+        label="Penyulang",
+    )
     period_bounds = parse_month_bounds(month)
-    validate_gi_trafo_filters(
+    validate_reading_entity_filters(
         gi_id=parsed_gi_id,
         trafo_id=parsed_trafo_id,
+        penyulang_id=parsed_penyulang_id,
     )
     return ReadingFilters(
         gi_id=parsed_gi_id,
         trafo_id=parsed_trafo_id,
+        penyulang_id=parsed_penyulang_id,
         period_start=period_bounds[0] if period_bounds else None,
         period_end=period_bounds[1] if period_bounds else None,
     )
