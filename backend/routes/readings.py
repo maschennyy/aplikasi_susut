@@ -15,6 +15,7 @@ def api_feeder_data():
         return jsonify(list_feeder_data(
             gi_id=request.args.get("gi_id"),
             trafo_id=request.args.get("trafo_id"),
+            penyulang_id=request.args.get("penyulang_id"),
             month=request.args.get("bulan", ""),
             page=request.args.get("page"),
             page_size=request.args.get("page_size"),

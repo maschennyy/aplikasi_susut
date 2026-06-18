@@ -80,6 +80,15 @@ export type FeederFilters = {
   periode: string;
 };
 
+export type FeederPagination = {
+  page: number;
+  pageSize: number;
+  total: number;
+  pages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+};
+
 type AsyncState<T> = {
   data: T;
   error: string | null;
@@ -99,14 +108,18 @@ type FeederData = {
 
 type UseFeederDataResult = {
   filters: FeederFilters;
+  pagination: FeederPagination;
   master: AsyncState<MasterData>;
   feeder: AsyncState<FeederData>;
   filteredTrafo: TrafoOption[];
   filteredPenyulang: PenyulangOption[];
   setFilters: (nextFilters: Partial<FeederFilters>) => void;
+  setPagination: (page: number, pageSize: number) => void;
   refreshMaster: () => Promise<void>;
   refreshFeeders: () => Promise<void>;
 };
+
+const DEFAULT_PAGE_SIZE = 50;
 
 const EMPTY_MASTER: MasterData = {
   garduInduk: [],
@@ -120,6 +133,15 @@ const EMPTY_METADATA: FeederMetadata = {
   totalKwhTerima: 0,
   totalSusutKwh: 0,
   avgSusutPersen: 0,
+};
+
+const EMPTY_PAGINATION: FeederPagination = {
+  page: 1,
+  pageSize: DEFAULT_PAGE_SIZE,
+  total: 0,
+  pages: 0,
+  hasNext: false,
+  hasPrev: false,
 };
 
 function normalizeFlag(value: string): AnomalyFlag {
@@ -222,7 +244,7 @@ function normalizeMetadata(rows: FeederRow[], rawMetadata: unknown): FeederMetad
   const avgSusutPersen = rows.length ? rows.reduce((total, row) => total + row.susutPersen, 0) / rows.length : 0;
 
   return {
-    totalRows: firstNumber(metadata, ["total_rows", "totalRows", "count"], rows.length),
+    totalRows: firstNumber(metadata, ["total", "total_rows", "totalRows", "count"], rows.length),
     totalKwhKirim: firstNumber(metadata, ["total_kwh_kirim", "totalKwhKirim"], totalKwhKirim),
     totalKwhTerima: firstNumber(metadata, ["total_kwh_terima", "totalKwhTerima"], totalKwhTerima),
     totalSusutKwh: firstNumber(metadata, ["total_susut_kwh", "totalSusutKwh"], totalSusutKwh),
@@ -231,17 +253,34 @@ function normalizeMetadata(rows: FeederRow[], rawMetadata: unknown): FeederMetad
 }
 
 function normalizeFeederData(data: unknown, filters: FeederFilters): FeederData {
-  const raw = Array.isArray(data) ? { feeders: data } : asRecord(data);
+  const raw = Array.isArray(data) ? { rows: data } : asRecord(data);
   const rows = asArray(raw.feeders ?? raw.data ?? raw.rows ?? []).map((row, index) =>
     normalizeFeederRow(row, filters.periode, index),
   );
-  const selectedRows = filters.penyulangId
-    ? rows.filter((row) => row.penyulangId === filters.penyulangId)
-    : rows;
 
   return {
-    feeders: selectedRows,
-    metadata: normalizeMetadata(selectedRows, raw.metadata ?? raw),
+    feeders: rows,
+    metadata: normalizeMetadata(rows, raw.metadata ?? raw),
+  };
+}
+
+function normalizePagination(
+  data: unknown,
+  fallback: Pick<FeederPagination, "page" | "pageSize">,
+): FeederPagination {
+  const raw = asRecord(data);
+  const page = Math.max(1, firstNumber(raw, ["page"], fallback.page));
+  const pageSize = Math.max(1, firstNumber(raw, ["page_size", "pageSize"], fallback.pageSize));
+  const total = Math.max(0, firstNumber(raw, ["total"], 0));
+  const pages = Math.max(0, firstNumber(raw, ["pages"], total > 0 ? Math.ceil(total / pageSize) : 0));
+
+  return {
+    page,
+    pageSize,
+    total,
+    pages,
+    hasNext: firstBoolean(raw, ["has_next", "hasNext"], page < pages),
+    hasPrev: firstBoolean(raw, ["has_prev", "hasPrev"], page > 1),
   };
 }
 
@@ -261,6 +300,7 @@ export function useFeederData(): UseFeederDataResult {
     penyulangId: null,
     periode: currentFeederPeriod(),
   });
+  const [pagination, setPaginationState] = useState<FeederPagination>(EMPTY_PAGINATION);
   const [master, setMaster] = useState<AsyncState<MasterData>>({
     data: EMPTY_MASTER,
     error: null,
@@ -276,6 +316,15 @@ export function useFeederData(): UseFeederDataResult {
 
   const setFilters = useCallback((nextFilters: Partial<FeederFilters>) => {
     setFiltersState((previous) => ({ ...previous, ...nextFilters }));
+    setPaginationState((previous) => ({ ...previous, page: 1 }));
+  }, []);
+
+  const setPagination = useCallback((page: number, pageSize: number) => {
+    setPaginationState((previous) => ({
+      ...previous,
+      page: Math.max(1, page),
+      pageSize: Math.max(1, pageSize),
+    }));
   }, []);
 
   const filteredTrafo = useMemo(() => {
@@ -337,6 +386,8 @@ export function useFeederData(): UseFeederDataResult {
           penyulang_id: filters.penyulangId || undefined,
           periode: filters.periode,
           bulan: monthParam(filters.periode),
+          page: pagination.page,
+          page_size: pagination.pageSize,
         },
       });
 
@@ -347,6 +398,7 @@ export function useFeederData(): UseFeederDataResult {
         error: null,
         isLoading: false,
       });
+      setPaginationState(normalizePagination(response.data, pagination));
     } catch (error) {
       if (requestId !== feederRequestIdRef.current) return;
       setFeeder({
@@ -355,7 +407,7 @@ export function useFeederData(): UseFeederDataResult {
         isLoading: false,
       });
     }
-  }, [filters]);
+  }, [filters, pagination.page, pagination.pageSize]);
 
   useEffect(() => {
     void refreshMaster();
@@ -375,11 +427,13 @@ export function useFeederData(): UseFeederDataResult {
 
   return {
     filters,
+    pagination,
     master,
     feeder,
     filteredTrafo,
     filteredPenyulang,
     setFilters,
+    setPagination,
     refreshMaster,
     refreshFeeders,
   };
