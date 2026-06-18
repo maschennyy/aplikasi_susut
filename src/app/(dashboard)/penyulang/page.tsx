@@ -32,11 +32,13 @@ export default function PenyulangPage() {
   const auth = useAuth();
   const {
     filters,
+    pagination,
     master,
     feeder: feederResource,
     filteredTrafo,
     filteredPenyulang,
     setFilters,
+    setPagination,
     refreshMaster,
     refreshFeeders,
   } = useFeederData();
@@ -239,8 +241,10 @@ export default function PenyulangPage() {
           hasEntityFilters={hasEntityFilters}
           loading={feederResource.isLoading}
           metadata={metadata}
+          pagination={pagination}
           rows={feederResource.data.feeders}
           selectedPeriodLabel={selectedPeriodLabel}
+          onPaginationChange={setPagination}
           onPreviousPeriod={handlePreviousPeriod}
           onRefresh={refreshFeeders}
           onResetFilters={handleResetFilters}
