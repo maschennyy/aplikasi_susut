@@ -1,0 +1,111 @@
+.pageStack {
+  display: grid;
+  gap: 20px;
+}
+
+.pageToolbar {
+  display: flex;
+  min-height: 64px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pageToolbar h2 {
+  margin: 0 !important;
+  color: var(--app-foreground) !important;
+  font-size: 24px !important;
+  font-weight: 760 !important;
+  line-height: 1.2 !important;
+}
+
+.toolbarMeta {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted) !important;
+}
+
+.toolbarActions,
+.filterRow,
+.summaryRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toolbarActions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.filterRow {
+  justify-content: space-between;
+}
+
+.summaryRow {
+  flex-wrap: wrap;
+}
+
+.panelCard {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: var(--shadow-panel);
+}
+
+.panelCard :global(.ant-card-body) {
+  padding: 18px;
+}
+
+.metricPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #314056;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 650;
+  box-shadow: 0 10px 24px rgba(13, 31, 58, 0.04);
+}
+
+.metricPill strong {
+  color: var(--app-foreground);
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.resetFilterButton {
+  color: #64748b;
+}
+
+.resetFilterButton:hover {
+  color: #be123c !important;
+  background: #fff1f2 !important;
+}
+
+.tableWrap {
+  display: grid;
+  gap: 12px;
+}
+
+.tableSkeleton {
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+@media (max-width: 1279px) {
+  .pageToolbar,
+  .filterRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .toolbarActions {
+    justify-content: flex-start;
+  }
+}

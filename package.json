@@ -9,7 +9,7 @@
     "backend:test": "python -m unittest discover -s backend/tests -t . -v",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "backend:db:upgrade": "python -m flask --app backend.entrypoint db upgrade",
     "backend:db:check": "python -m flask --app backend.entrypoint schema-check",

@@ -7,6 +7,7 @@ import { CalendarClock, FilterX, RefreshCw } from "lucide-react";
 import { AnomalyBadge } from "@/components/penyulang/AnomalyBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import type { MeterMetadata, MeterMode, MeterRow } from "@/hooks/useMeterData";
+import { formatNumber, formatRawValue } from "@/lib/formatters";
 import styles from "./meter-gi.module.css";
 
 const { Text } = Typography;
@@ -23,21 +24,6 @@ type MeterTableProps = {
   onRefresh: () => Promise<void>;
   onResetFilters: () => void;
 };
-
-const NUMBER_FORMATTER = new Intl.NumberFormat("id-ID", {
-  maximumFractionDigits: 2,
-});
-
-function formatNumber(value: number) {
-  return NUMBER_FORMATTER.format(value);
-}
-
-function compactValue(value: unknown) {
-  if (value === null || value === undefined || value === "") return "-";
-  if (typeof value === "number") return NUMBER_FORMATTER.format(value);
-  if (typeof value === "boolean") return value ? "Ya" : "Tidak";
-  return String(value);
-}
 
 export function MeterTable({
   rows,
@@ -187,7 +173,7 @@ export function MeterTable({
             <Descriptions bordered column={4} size="small">
               {Object.entries(row.detail).slice(0, 20).map(([key, value]) => (
                 <Descriptions.Item key={key} label={key}>
-                  {compactValue(value)}
+                  {formatRawValue(value)}
                 </Descriptions.Item>
               ))}
             </Descriptions>

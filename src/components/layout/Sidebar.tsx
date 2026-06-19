@@ -3,25 +3,22 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
-import { Badge, Button, Layout, Menu, Skeleton, Tooltip, Typography } from "antd";
+import { Button, Menu, Tooltip, Typography } from "antd";
 import type { MenuProps } from "antd";
 import { ChevronLeft, ChevronRight, Zap } from "lucide-react";
 import { filterNavGroups, findActiveNavItem, navIcon } from "@/components/layout/navigation";
 import type { Role } from "@/types";
 import styles from "./layout.module.css";
 
-const { Sider } = Layout;
 const { Text } = Typography;
 
 type SidebarProps = {
   collapsed: boolean;
-  giAktif: number;
-  statsLoading: boolean;
   userRole?: Role | null;
   onCollapseChange: (collapsed: boolean) => void;
 };
 
-export function Sidebar({ collapsed, giAktif, statsLoading, userRole, onCollapseChange }: SidebarProps) {
+export function Sidebar({ collapsed, userRole, onCollapseChange }: SidebarProps) {
   const pathname = usePathname();
   const activeItem = findActiveNavItem(pathname);
 
@@ -44,16 +41,9 @@ export function Sidebar({ collapsed, giAktif, statsLoading, userRole, onCollapse
   }, [userRole]);
 
   return (
-    <Sider
-      breakpoint="lg"
+    <aside
+      aria-label="Navigasi utama"
       className={`${styles.sidebar} ${collapsed ? styles.sidebarCollapsed : styles.sidebarExpanded}`}
-      collapsed={collapsed}
-      collapsedWidth={64}
-      collapsible
-      theme="light"
-      trigger={null}
-      width={220}
-      onBreakpoint={(broken) => onCollapseChange(broken)}
     >
       <div className={styles.sidebarInner}>
         <div className={styles.brandArea}>
@@ -86,21 +76,7 @@ export function Sidebar({ collapsed, giAktif, statsLoading, userRole, onCollapse
           mode="inline"
           selectedKeys={activeItem ? [activeItem.href] : []}
         />
-
-        <div className={styles.sidebarFooter}>
-          <div className={styles.giStatus}>
-            <span className={styles.giStatusIcon}>
-              <Badge color="#00a650" status="processing" />
-            </span>
-            {!collapsed ? (
-              <span className={styles.giStatusText}>
-                <Text type="secondary">GI aktif</Text>
-                {statsLoading ? <Skeleton.Input active size="small" className={styles.giSkeleton} /> : <strong>{giAktif}</strong>}
-              </span>
-            ) : null}
-          </div>
-        </div>
       </div>
-    </Sider>
+    </aside>
   );
 }

@@ -1,5 +1,6 @@
 .appShell {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--app-background);
 }
 
@@ -11,27 +12,42 @@
 }
 
 .mainShell {
+  height: 100vh;
   min-width: 0;
+  overflow: hidden;
   background: var(--app-background);
+  transition: margin-left 0.2s ease;
+}
+
+.mainShellExpanded {
+  margin-left: 220px;
+}
+
+.mainShellCollapsed {
+  margin-left: 64px;
 }
 
 .contentShell {
-  min-height: calc(100vh - 64px);
+  height: calc(100vh - 64px);
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 24px;
-  background: #f8f9fa;
+  background: var(--app-background);
 }
 
 .sidebar {
-  position: sticky;
+  position: fixed;
   top: 0;
   left: 0;
   z-index: 20;
   height: 100vh;
+  min-height: 100vh;
+  flex: none !important;
   overflow: hidden;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(180deg, #071f45 0%, #092b58 54%, #073d60 100%);
-  box-shadow: 20px 0 60px rgba(7, 31, 69, 0.18);
+  border-right: 1px solid #e2e8f0;
+  background: var(--sidebar-background);
+  box-shadow: 10px 0 28px rgba(15, 23, 42, 0.08);
   transition: width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease, flex-basis 0.2s ease;
 }
 
@@ -39,8 +55,8 @@
   width: 220px;
 }
 
-.sidebar :global(.ant-layout-sider-children) {
-  transition: width 0.2s ease;
+.sidebarCollapsed {
+  width: 64px;
 }
 
 .sidebarInner {
@@ -56,7 +72,7 @@
   justify-content: space-between;
   min-height: 64px;
   padding: 12px 12px 12px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid #eef2f7;
 }
 
 .brandLink {
@@ -64,7 +80,7 @@
   align-items: center;
   min-width: 0;
   gap: 12px;
-  color: #ffffff;
+  color: var(--sidebar-foreground);
   text-decoration: none;
 }
 
@@ -76,9 +92,9 @@
   height: 40px;
   flex: 0 0 auto;
   border-radius: 8px;
-  color: #05224a;
-  background: linear-gradient(135deg, #55d6ff, #28ddb7);
-  box-shadow: 0 14px 34px rgba(0, 163, 215, 0.26);
+  color: #083344;
+  background: linear-gradient(135deg, #67e8f9, #2dd4bf);
+  box-shadow: 0 12px 26px rgba(15, 159, 143, 0.18);
 }
 
 .brandText {
@@ -90,7 +106,7 @@
 
 .brandText strong {
   overflow: hidden;
-  color: #ffffff;
+  color: #0f172a;
   font-size: 14px;
   font-weight: 760;
   text-overflow: ellipsis;
@@ -99,7 +115,7 @@
 
 .brandText span {
   margin-top: 2px;
-  color: #a9bbd2 !important;
+  color: var(--sidebar-muted) !important;
   font-size: 12px;
 }
 
@@ -107,17 +123,18 @@
   width: 28px;
   height: 28px;
   flex: 0 0 auto;
-  color: #c8d6e8;
+  color: var(--sidebar-muted);
 }
 
 .collapseButton:hover {
-  color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.09) !important;
+  color: var(--sidebar-active) !important;
+  background: var(--sidebar-active-bg) !important;
 }
 
 .navMenu {
   flex: 1;
   min-height: 0;
+  max-height: calc(100vh - 64px);
   overflow-y: auto;
   overflow-x: hidden;
   border-inline-end: 0 !important;
@@ -132,13 +149,13 @@
   margin: 3px 0;
   margin-inline: 0;
   border-radius: 8px;
-  color: #c8d6e8;
+  color: var(--sidebar-foreground);
   font-size: 12px;
   font-weight: 500;
 }
 
 .navMenu :global(.ant-menu-item .ant-menu-item-icon) {
-  color: #8db9dc;
+  color: #475569;
 }
 
 .navMenu :global(.ant-menu-title-content) {
@@ -148,23 +165,23 @@
 }
 
 .navMenu :global(.ant-menu-item:hover) {
-  color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.08) !important;
+  color: #0f172a !important;
+  background: #f1f5f9 !important;
 }
 
 .navMenu :global(.ant-menu-item:hover .ant-menu-item-icon) {
-  color: #55d6ff;
+  color: var(--sidebar-active);
 }
 
 .navMenu :global(.ant-menu-item-selected) {
-  color: #67e8f9;
-  background: rgba(85, 214, 255, 0.14) !important;
-  box-shadow: inset 3px 0 0 #55d6ff;
+  color: var(--sidebar-active);
+  background: var(--sidebar-active-bg) !important;
+  box-shadow: inset 3px 0 0 var(--sidebar-active);
   font-weight: 680;
 }
 
 .navMenu :global(.ant-menu-item-selected .ant-menu-item-icon) {
-  color: #55d6ff;
+  color: var(--sidebar-active);
 }
 
 .navMenu :global(.ant-menu-item-selected::after) {
@@ -173,7 +190,7 @@
 
 .navMenu :global(.ant-menu-item-group-title) {
   padding: 14px 12px 7px;
-  color: #75a8cf;
+  color: #94a3b8;
   font-size: 11px;
   font-weight: 720;
   letter-spacing: 0;
@@ -185,52 +202,6 @@
   text-decoration: none;
 }
 
-.sidebarFooter {
-  padding: 10px 10px 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.giStatus {
-  display: flex;
-  align-items: center;
-  min-height: 48px;
-  gap: 10px;
-  border: 1px solid rgba(85, 214, 255, 0.18);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.07);
-  padding: 10px 12px;
-}
-
-.giStatusIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-}
-
-.giStatusText {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.giStatusText strong {
-  color: #6ee7d8;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.giStatusText span {
-  color: #b4c3d5 !important;
-}
-
-.giSkeleton {
-  width: 42px !important;
-}
-
 .topbar {
   position: sticky;
   top: 0;
@@ -240,9 +211,9 @@
   justify-content: space-between;
   height: 64px;
   padding: 0 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: #071f45;
-  box-shadow: 0 12px 30px rgba(7, 31, 69, 0.16);
+  border-bottom: 0;
+  background: linear-gradient(90deg, var(--shell-navy), #09213a);
+  box-shadow: 0 10px 26px rgba(7, 31, 69, 0.12);
 }
 
 .topbarLeft,
@@ -258,7 +229,7 @@
 
 .topbarAppName {
   overflow: hidden;
-  color: #e8f2ff !important;
+  color: #f8fafc !important;
   font-size: 14px;
   font-weight: 500;
   text-overflow: ellipsis;
@@ -269,7 +240,7 @@
 .alertButton {
   width: 38px;
   height: 38px;
-  color: #d7e5f5;
+  color: #cbd5e1;
 }
 
 .alertButton {
@@ -291,7 +262,7 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
+  color: #f8fafc;
 }
 
 .userButton:hover {
@@ -319,6 +290,7 @@
 .userMeta strong {
   max-width: 100%;
   overflow: hidden;
+  color: #f8fafc;
   font-size: 13px;
   font-weight: 700;
   text-overflow: ellipsis;
@@ -326,12 +298,68 @@
 }
 
 .userMeta span {
-  color: #a9bbd2 !important;
+  color: #cbd5e1 !important;
   font-size: 11px;
 }
 
 .spinIcon {
   animation: spin 0.85s linear infinite;
+}
+
+.floatingGiStatus {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 148px;
+  border: 1px solid rgba(15, 159, 143, 0.2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 16px 36px rgba(13, 31, 58, 0.14);
+  backdrop-filter: blur(14px);
+}
+
+.floatingGiDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.floatingGiText {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.floatingGiText span {
+  color: var(--text-muted) !important;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.floatingGiText strong {
+  color: var(--app-foreground);
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 18px;
+  font-weight: 760;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.floatingGiSkeleton {
+  width: 48px !important;
+  height: 18px !important;
 }
 
 @keyframes spin {
@@ -390,12 +418,10 @@
   text-align: center;
 }
 
-.sidebarCollapsed .sidebarFooter {
-  padding: 10px 8px 14px;
-}
-
-.sidebarCollapsed .giStatus {
-  justify-content: center;
-  min-height: 42px;
-  padding: 8px;
+@media (max-width: 720px) {
+  .floatingGiStatus {
+    right: 16px;
+    bottom: 16px;
+    min-width: 132px;
+  }
 }

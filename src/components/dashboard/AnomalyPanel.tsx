@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, List, Skeleton, Tag, Typography } from "antd";
-import { ShieldCheck, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import type { AnomalyItem, ExecutiveDashboardData, ResourceState } from "@/hooks/useDashboardData";
 import { EmptyState } from "@/components/shared/EmptyState";
 import styles from "./dashboard.module.css";
@@ -18,6 +18,20 @@ const severityMap: Record<AnomalyItem["severity"], { color: string; label: strin
   warning: { color: "gold", label: "Warning" },
   alert: { color: "red", label: "Alert" },
 };
+
+function AnomalyClearIllustration() {
+  return (
+    <svg aria-hidden="true" className={styles.emptyIllustration} viewBox="0 0 120 84" fill="none">
+      <rect x="18" y="12" width="84" height="60" rx="18" fill="#DFF8EA" />
+      <circle cx="58" cy="42" r="20" fill="#FFFFFF" stroke="#12805C" strokeWidth="2" />
+      <path d="M48 42.5L55 49L70 33" stroke="#12805C" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M83 25L77 39H85L79 55" stroke="#0F9F8F" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M34 31H43" stroke="#8CD9B1" strokeWidth="2" strokeLinecap="round" />
+      <path d="M31 42H40" stroke="#8CD9B1" strokeWidth="2" strokeLinecap="round" />
+      <path d="M36 53H45" stroke="#8CD9B1" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 export function AnomalyPanel({ resource, onRetry }: AnomalyPanelProps) {
   return (
@@ -42,8 +56,9 @@ export function AnomalyPanel({ resource, onRetry }: AnomalyPanelProps) {
       ) : resource.data.anomalies.length === 0 ? (
         <EmptyState
           description="Tidak ada anomali baru pada periode terpilih."
-          icon={ShieldCheck}
+          illustration={<AnomalyClearIllustration />}
           title="Tidak ada anomali"
+          variant="success"
         />
       ) : (
         <List

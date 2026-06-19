@@ -7,6 +7,7 @@ import { CalendarClock, FilterX, RefreshCw } from "lucide-react";
 import { AnomalyBadge } from "@/components/penyulang/AnomalyBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import type { FeederMetadata, FeederPagination, FeederRow } from "@/hooks/useFeederData";
+import { formatKwh, formatPercent, formatRawValue } from "@/lib/formatters";
 import styles from "./penyulang.module.css";
 
 const { Text } = Typography;
@@ -24,30 +25,6 @@ type FeederTableProps = {
   onRefresh: () => Promise<void>;
   onPaginationChange: (page: number, pageSize: number) => void;
 };
-
-const NUMBER_FORMATTER = new Intl.NumberFormat("id-ID", {
-  maximumFractionDigits: 2,
-});
-
-const PERCENT_FORMATTER = new Intl.NumberFormat("id-ID", {
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 2,
-});
-
-function formatKwh(value: number) {
-  return NUMBER_FORMATTER.format(value);
-}
-
-function formatPercent(value: number) {
-  return `${PERCENT_FORMATTER.format(value)}%`;
-}
-
-function compactValue(value: unknown) {
-  if (value === null || value === undefined || value === "") return "-";
-  if (typeof value === "number") return NUMBER_FORMATTER.format(value);
-  if (typeof value === "boolean") return value ? "Ya" : "Tidak";
-  return String(value);
-}
 
 function rowSeverityClass(row: FeederRow) {
   if (row.anomalyFlags.length > 0) return styles.alertRow;
@@ -216,7 +193,7 @@ export function FeederTable({
             <Descriptions bordered column={4} size="small">
               {Object.entries(row.detail).slice(0, 20).map(([key, value]) => (
                 <Descriptions.Item key={key} label={key}>
-                  {compactValue(value)}
+                  {formatRawValue(value)}
                 </Descriptions.Item>
               ))}
             </Descriptions>

@@ -1,12 +1,18 @@
 :root {
   color-scheme: light;
-  --app-background: #f8f9fa;
+  --app-background: #f8fafc;
   --app-foreground: #102033;
   --surface: #ffffff;
   --surface-subtle: #f8fafc;
   --surface-raised: rgba(255, 255, 255, 0.88);
   --border-soft: #e5e7eb;
   --text-muted: #64748b;
+  --shell-navy: #071a2f;
+  --sidebar-background: #ffffff;
+  --sidebar-foreground: #334155;
+  --sidebar-muted: #64748b;
+  --sidebar-active: #0f766e;
+  --sidebar-active-bg: #ecfdf5;
   --pln-navy: #073b86;
   --pln-blue: #0b63ce;
   --pln-cyan: #00a3d7;

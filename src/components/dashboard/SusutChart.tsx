@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, Skeleton, Typography } from "antd";
-import { CalendarClock, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { DashboardData, ResourceState } from "@/hooks/useDashboardData";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { formatPercent } from "@/lib/formatters";
 import styles from "./dashboard.module.css";
 
 const { Text, Title } = Typography;
@@ -24,8 +25,19 @@ type SusutChartProps = {
   onRetry: () => void;
 };
 
-function formatPercent(value: number) {
-  return `${value.toFixed(2)}%`;
+function TrendEmptyIllustration() {
+  return (
+    <svg aria-hidden="true" className={styles.emptyIllustration} viewBox="0 0 120 84" fill="none">
+      <rect x="14" y="12" width="92" height="60" rx="14" fill="#E8F7F5" />
+      <path d="M31 58H91" stroke="#B8DAD6" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M31 46H91" stroke="#D3E8E5" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M31 34H91" stroke="#D3E8E5" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M33 55C41 43 48 47 55 36C62 25 70 31 77 24C83 18 88 21 94 16" stroke="#0F9F8F" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="55" cy="36" r="4" fill="#FFFFFF" stroke="#0F9F8F" strokeWidth="2" />
+      <path d="M44 66H76" stroke="#073B86" strokeWidth="2" strokeLinecap="round" />
+      <path d="M60 72V66" stroke="#073B86" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 export function SusutChart({ resource, selectedPeriodLabel, onPreviousPeriod, onRetry }: SusutChartProps) {
@@ -51,9 +63,11 @@ export function SusutChart({ resource, selectedPeriodLabel, onPreviousPeriod, on
       ) : resource.data.monthlyData.length === 0 ? (
         <EmptyState
           actionLabel="Lihat Bulan Sebelumnya"
+          actionType="primary"
           description={`Data untuk periode ${selectedPeriodLabel} belum tersedia. Pastikan data sudah diinput atau coba bulan sebelumnya.`}
-          icon={CalendarClock}
+          illustration={<TrendEmptyIllustration />}
           title="Belum ada data bulan ini"
+          variant="neutral"
           onAction={onPreviousPeriod}
         />
       ) : (

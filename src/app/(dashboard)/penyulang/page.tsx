@@ -12,17 +12,10 @@ import { CascadeFilter } from "@/components/shared/CascadeFilter";
 import { ExportButton } from "@/components/shared/ExportButton";
 import { useAuth } from "@/hooks/useAuth";
 import { currentFeederPeriod, useFeederData } from "@/hooks/useFeederData";
+import { formatKwh } from "@/lib/formatters";
 import { formatPeriodLabel, previousPeriod } from "@/lib/period";
 
 const { Text, Title } = Typography;
-
-const NUMBER_FORMATTER = new Intl.NumberFormat("id-ID", {
-  maximumFractionDigits: 2,
-});
-
-function formatKwh(value: number) {
-  return NUMBER_FORMATTER.format(value);
-}
 
 function monthParam(period: string) {
   return `${period.slice(0, 4)}-${period.slice(4, 6)}`;

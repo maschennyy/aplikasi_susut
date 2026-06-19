@@ -5,6 +5,7 @@ import type { ColumnsType } from "antd/es/table";
 import { CalendarClock, RefreshCw } from "lucide-react";
 import type { DeviasiGiRow, ExecutiveDashboardData, ResourceState } from "@/hooks/useDashboardData";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { formatPercent, formatRoundedNumber } from "@/lib/formatters";
 import styles from "./dashboard.module.css";
 
 const { Text, Title } = Typography;
@@ -22,14 +23,6 @@ const statusMap: Record<DeviasiGiRow["status"], { color: string; label: string }
   alert: { color: "error", label: "Alert" },
 };
 
-function formatKwh(value: number) {
-  return new Intl.NumberFormat("id-ID").format(Math.round(value));
-}
-
-function formatPercent(value: number) {
-  return `${value.toFixed(2)}%`;
-}
-
 const columns: ColumnsType<DeviasiGiRow> = [
   {
     title: "GI",
@@ -43,21 +36,21 @@ const columns: ColumnsType<DeviasiGiRow> = [
     dataIndex: "kwhMasuk",
     key: "kwhMasuk",
     align: "right",
-    render: (value: number) => <span className={styles.monoCell}>{formatKwh(value)}</span>,
+    render: (value: number) => <span className={styles.monoCell}>{formatRoundedNumber(value)}</span>,
   },
   {
     title: "kWh Keluar",
     dataIndex: "kwhKeluar",
     key: "kwhKeluar",
     align: "right",
-    render: (value: number) => <span className={styles.monoCell}>{formatKwh(value)}</span>,
+    render: (value: number) => <span className={styles.monoCell}>{formatRoundedNumber(value)}</span>,
   },
   {
     title: "Susut kWh",
     dataIndex: "susutKwh",
     key: "susutKwh",
     align: "right",
-    render: (value: number) => <span className={styles.monoCell}>{formatKwh(value)}</span>,
+    render: (value: number) => <span className={styles.monoCell}>{formatRoundedNumber(value)}</span>,
   },
   {
     title: "Susut %",

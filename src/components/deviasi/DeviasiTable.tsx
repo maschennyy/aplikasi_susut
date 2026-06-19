@@ -7,11 +7,10 @@ import { CalendarClock, FilterX, RefreshCw } from "lucide-react";
 import { AnomalyBadge } from "@/components/penyulang/AnomalyBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import type { DeviationValue, DeviasiRow } from "@/lib/deviasi";
+import { formatNumber, formatPercent } from "@/lib/formatters";
 import styles from "./deviasi.module.css";
 
 const { Text } = Typography;
-const NUMBER = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
-const PERCENT = new Intl.NumberFormat("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export type DeviasiTableProps = {
   rows: DeviasiRow[];
@@ -23,10 +22,6 @@ export type DeviasiTableProps = {
   onResetFilters: () => void;
   onRefresh: () => Promise<void>;
 };
-
-function formatPercent(value: number | null) {
-  return value === null ? "-" : `${PERCENT.format(value)}%`;
-}
 
 function percentClass(value: DeviationValue) {
   if (value.severity === "alert") return styles.percentAlert;
@@ -74,7 +69,7 @@ export function DeviasiTable(props: DeviasiTableProps) {
       align: "right",
       width: 170,
       sorter: (a, b) => a.kwhMeterUtama - b.kwhMeterUtama,
-      render: (value: number) => <span className={styles.monoCell}>{NUMBER.format(value)}</span>,
+      render: (value: number) => <span className={styles.monoCell}>{formatNumber(value)}</span>,
     },
     {
       title: "kWh Meter Pembanding",
@@ -82,7 +77,7 @@ export function DeviasiTable(props: DeviasiTableProps) {
       align: "right",
       width: 190,
       sorter: (a, b) => a.kwhMeterPembanding - b.kwhMeterPembanding,
-      render: (value: number) => <span className={styles.monoCell}>{NUMBER.format(value)}</span>,
+      render: (value: number) => <span className={styles.monoCell}>{formatNumber(value)}</span>,
     },
     {
       title: "kWh Penyulang",
@@ -90,7 +85,7 @@ export function DeviasiTable(props: DeviasiTableProps) {
       align: "right",
       width: 165,
       sorter: (a, b) => a.kwhPenyulang - b.kwhPenyulang,
-      render: (value: number) => <span className={styles.monoCell}>{NUMBER.format(value)}</span>,
+      render: (value: number) => <span className={styles.monoCell}>{formatNumber(value)}</span>,
     },
     {
       title: "Deviasi Utama - Pembanding",
@@ -101,7 +96,7 @@ export function DeviasiTable(props: DeviasiTableProps) {
           align: "right",
           width: 145,
           sorter: (a, b) => a.deviasiUtamaPembanding.kwh - b.deviasiUtamaPembanding.kwh,
-          render: (_, row) => <span className={styles.monoCell}>{NUMBER.format(row.deviasiUtamaPembanding.kwh)}</span>,
+          render: (_, row) => <span className={styles.monoCell}>{formatNumber(row.deviasiUtamaPembanding.kwh)}</span>,
         },
         {
           title: "%",
@@ -121,7 +116,7 @@ export function DeviasiTable(props: DeviasiTableProps) {
           align: "right",
           width: 145,
           sorter: (a, b) => a.deviasiPembandingFeeder.kwh - b.deviasiPembandingFeeder.kwh,
-          render: (_, row) => <span className={styles.monoCell}>{NUMBER.format(row.deviasiPembandingFeeder.kwh)}</span>,
+          render: (_, row) => <span className={styles.monoCell}>{formatNumber(row.deviasiPembandingFeeder.kwh)}</span>,
         },
         {
           title: "%",

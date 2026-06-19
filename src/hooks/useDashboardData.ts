@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { api, apiErrorMessage } from "@/lib/api";
+import { formatPercent } from "@/lib/formatters";
 import { asArray, asRecord, firstNumber, firstString, periodFromValue } from "@/lib/normalizers";
 
 export type ResourceState<T> = {
@@ -17,6 +18,10 @@ export type KpiData = {
   rataSusutPersen: number;
   totalKwhMasuk: number;
   totalKwhKeluar: number;
+  totalGiTrendPersen: number;
+  giAktifTrendPersen: number;
+  rataSusutTrendPersen: number;
+  totalKwhMasukTrendPersen: number;
 };
 
 export type MonthlySusutPoint = {
@@ -199,7 +204,7 @@ function normalizeAnomalies(raw: Record<string, unknown>): AnomalyItem[] {
       key: firstString(row, ["id", "kode_penyulang"], `${title}-${index}`),
       title,
       subtitle: `${gi} - ${type}`,
-      metric: `${deviasi.toFixed(2)}%`,
+      metric: formatPercent(deviasi),
       severity: anomalySeverity(deviasi),
     };
   });
@@ -229,6 +234,10 @@ function normalizeExecutive(rawValue: unknown, dashboard: DashboardData | null):
       rataSusutPersen: firstNumber(rawKpi, ["rata_susut_persen", "avg_susut_persen"], firstNumber(raw, ["susut_persen"], fallbackTotal?.susutPersen ?? 0)),
       totalKwhMasuk: firstNumber(rawKpi, ["total_kwh_masuk"], firstNumber(raw, ["total_kwh_masuk"], fallbackTotal?.kwhMasuk ?? 0)),
       totalKwhKeluar: firstNumber(rawKpi, ["total_kwh_keluar"], firstNumber(raw, ["total_kwh_keluar"], fallbackTotal?.kwhKeluar ?? 0)),
+      totalGiTrendPersen: firstNumber(rawKpi, ["total_gi_trend_persen", "total_gi_delta_persen", "total_gi_vs_prev"], firstNumber(raw, ["total_gi_trend_persen", "total_gi_delta_persen"])),
+      giAktifTrendPersen: firstNumber(rawKpi, ["gi_aktif_trend_persen", "gi_aktif_delta_persen", "active_gi_vs_prev"], firstNumber(raw, ["gi_aktif_trend_persen", "gi_aktif_delta_persen"])),
+      rataSusutTrendPersen: firstNumber(rawKpi, ["rata_susut_trend_persen", "susut_trend_persen", "susut_delta_persen"], firstNumber(raw, ["rata_susut_trend_persen", "susut_trend_persen", "susut_delta_persen"])),
+      totalKwhMasukTrendPersen: firstNumber(rawKpi, ["total_kwh_masuk_trend_persen", "kwh_masuk_trend_persen", "total_kwh_masuk_delta_persen"], firstNumber(raw, ["total_kwh_masuk_trend_persen", "kwh_masuk_trend_persen", "total_kwh_masuk_delta_persen"])),
     },
     deviasiGi,
     anomalies,

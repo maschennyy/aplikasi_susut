@@ -1,60 +1,29 @@
 .pageStack {
-  display: grid;
-  gap: 20px;
+  composes: pageStack from "../shared/page-shell.module.css";
 }
 
 .pageToolbar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 64px;
-}
-
-.pageToolbar h2 {
-  margin: 0 !important;
-  color: var(--app-foreground) !important;
-  font-size: 24px !important;
-  font-weight: 760 !important;
-  line-height: 1.2 !important;
+  composes: pageToolbar from "../shared/page-shell.module.css";
 }
 
 .toolbarMeta {
-  display: block;
-  margin-top: 3px;
-  color: var(--text-muted) !important;
-}
-
-.toolbarActions,
-.filterRow,
-.summaryRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  composes: toolbarMeta from "../shared/page-shell.module.css";
 }
 
 .toolbarActions {
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  composes: toolbarActions from "../shared/page-shell.module.css";
 }
 
 .filterRow {
-  justify-content: space-between;
+  composes: filterRow from "../shared/page-shell.module.css";
 }
 
 .summaryRow {
-  flex-wrap: wrap;
+  composes: summaryRow from "../shared/page-shell.module.css";
 }
 
 .panelCard {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #ffffff;
-  box-shadow: var(--shadow-panel);
-}
-
-.panelCard :global(.ant-card-body) {
-  padding: 18px;
+  composes: panelCard from "../shared/page-shell.module.css";
 }
 
 .modeBadge {
@@ -71,44 +40,19 @@
 }
 
 .metricPill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 34px;
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
-  padding: 6px 10px;
-  color: #314056;
-  background: #ffffff;
-  font-size: 12px;
-  font-weight: 650;
-  box-shadow: 0 10px 24px rgba(13, 31, 58, 0.04);
-}
-
-.metricPill strong {
-  color: var(--app-foreground);
-  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-variant-numeric: tabular-nums;
+  composes: metricPill from "../shared/page-shell.module.css";
 }
 
 .tableWrap {
-  display: grid;
-  gap: 12px;
+  composes: tableWrap from "../shared/page-shell.module.css";
 }
 
 .tableSkeleton {
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
-  padding: 18px;
+  composes: tableSkeleton from "../shared/page-shell.module.css";
 }
 
 .resetFilterButton {
-  color: #64748b;
-}
-
-.resetFilterButton:hover {
-  color: #be123c !important;
-  background: #fff1f2 !important;
+  composes: resetFilterButton from "../shared/page-shell.module.css";
 }
 
 .primaryCell {
@@ -137,16 +81,4 @@
 
 .tableWrap :global(.ant-table-summary) {
   background: #f6f9fd;
-}
-
-@media (max-width: 1279px) {
-  .pageToolbar,
-  .filterRow {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .toolbarActions {
-    justify-content: flex-start;
-  }
 }

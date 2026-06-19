@@ -1,76 +1,37 @@
 .pageStack {
-  display: grid;
-  gap: 20px;
+  composes: pageStack from "../shared/page-shell.module.css";
 }
 
 .pageToolbar {
-  display: flex;
-  min-height: 64px;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.pageToolbar h2 {
-  margin: 0 !important;
-  color: var(--app-foreground) !important;
-  font-size: 24px !important;
-  font-weight: 760 !important;
-  line-height: 1.2 !important;
+  composes: pageToolbar from "../shared/page-shell.module.css";
 }
 
 .toolbarMeta {
-  display: block;
-  margin-top: 3px;
-  color: var(--text-muted) !important;
-}
-
-.toolbarActions,
-.filterRow,
-.statusCounts {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  composes: toolbarMeta from "../shared/page-shell.module.css";
 }
 
 .toolbarActions {
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  composes: toolbarActions from "../shared/page-shell.module.css";
 }
 
 .filterRow {
-  justify-content: space-between;
+  composes: filterRow from "../shared/page-shell.module.css";
 }
 
 .panelCard {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #ffffff;
-  box-shadow: var(--shadow-panel);
-}
-
-.panelCard :global(.ant-card-body) {
-  padding: 18px;
+  composes: panelCard from "../shared/page-shell.module.css";
 }
 
 .resetFilterButton {
-  color: #64748b;
-}
-
-.resetFilterButton:hover {
-  color: #be123c !important;
-  background: #fff1f2 !important;
+  composes: resetFilterButton from "../shared/page-shell.module.css";
 }
 
 .tableWrap {
-  display: grid;
-  gap: 12px;
+  composes: tableWrap from "../shared/page-shell.module.css";
 }
 
 .tableSkeleton {
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
-  padding: 18px;
+  composes: tableSkeleton from "../shared/page-shell.module.css";
 }
 
 .primaryCell {
@@ -151,6 +112,9 @@
 }
 
 .statusCounts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
@@ -237,8 +201,6 @@
 }
 
 @media (max-width: 1279px) {
-  .pageToolbar,
-  .filterRow,
   .summaryHeader {
     align-items: flex-start;
     flex-direction: column;

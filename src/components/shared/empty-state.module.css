@@ -3,7 +3,18 @@
   justify-items: center;
   gap: 10px;
   padding: 32px 18px;
+  border-radius: 12px;
   text-align: center;
+}
+
+.neutral {
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.success {
+  border: 1px solid #bbf7d0;
+  background: #ecfdf5;
 }
 
 .iconWrap {
@@ -35,4 +46,16 @@
 
 .action {
   margin-top: 4px;
+}
+
+.primaryAction {
+  border-color: var(--pln-teal) !important;
+  background: var(--pln-teal) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 20px rgba(15, 159, 143, 0.18);
+}
+
+.primaryAction:hover {
+  border-color: #0b8f81 !important;
+  background: #0b8f81 !important;
 }

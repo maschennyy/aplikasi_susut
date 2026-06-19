@@ -10,6 +10,7 @@ import { ActiveFilterChips, type ActiveFilterChip } from "@/components/shared/Ac
 import { CascadeFilter } from "@/components/shared/CascadeFilter";
 import { ExportButton } from "@/components/shared/ExportButton";
 import { currentMeterPeriod, useMeterData, type MeterMode } from "@/hooks/useMeterData";
+import { formatNumber } from "@/lib/formatters";
 import { formatPeriodLabel, previousPeriod } from "@/lib/period";
 
 const { Text, Title } = Typography;
@@ -17,14 +18,6 @@ const { Text, Title } = Typography;
 type MeterGiPageProps = {
   mode: MeterMode;
 };
-
-const NUMBER_FORMATTER = new Intl.NumberFormat("id-ID", {
-  maximumFractionDigits: 2,
-});
-
-function formatNumber(value: number) {
-  return NUMBER_FORMATTER.format(value);
-}
 
 function monthParam(period: string) {
   return `${period.slice(0, 4)}-${period.slice(4, 6)}`;

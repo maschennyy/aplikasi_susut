@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Layout, Spin } from "antd";
+import { Badge, Layout, Skeleton, Spin, Typography } from "antd";
 import { useAuth } from "@/hooks/useAuth";
 import { useSidebarStats } from "@/hooks/useSidebarStats";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -15,6 +15,7 @@ type AppLayoutProps = {
   children: ReactNode;
 };
 
+const { Text } = Typography;
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "pln-susut-sidebar-collapsed";
 
 export function AppLayout({ children }: AppLayoutProps) {
@@ -66,12 +67,10 @@ function AuthenticatedFrame({ children, user }: AppLayoutProps & { user: User })
     <Layout hasSider className={styles.appShell}>
       <Sidebar
         collapsed={collapsed}
-        giAktif={sidebarStats.stats.gi_aktif}
-        statsLoading={sidebarStats.isLoading}
         userRole={user.role}
         onCollapseChange={handleCollapseChange}
       />
-      <Layout className={styles.mainShell}>
+      <Layout className={`${styles.mainShell} ${collapsed ? styles.mainShellCollapsed : styles.mainShellExpanded}`}>
         <Topbar
           alertCount={sidebarStats.stats.alert_count}
           statsError={sidebarStats.error}
@@ -81,6 +80,21 @@ function AuthenticatedFrame({ children, user }: AppLayoutProps & { user: User })
         />
         <main className={styles.contentShell}>{children}</main>
       </Layout>
+      <FloatingGiStatus giAktif={sidebarStats.stats.gi_aktif} loading={sidebarStats.isLoading} />
     </Layout>
+  );
+}
+
+function FloatingGiStatus({ giAktif, loading }: { giAktif: number; loading: boolean }) {
+  return (
+    <div className={styles.floatingGiStatus} role="status" aria-live="polite">
+      <span className={styles.floatingGiDot}>
+        <Badge color="#10b981" status="processing" />
+      </span>
+      <span className={styles.floatingGiText}>
+        <Text type="secondary">GI aktif</Text>
+        {loading ? <Skeleton.Input active size="small" className={styles.floatingGiSkeleton} /> : <strong>{giAktif}</strong>}
+      </span>
+    </div>
   );
 }
